@@ -1,7 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
-use http_body_util::{BodyExt, Empty, combinators::BoxBody};
+use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
 use hyper::{Request, body::Bytes, server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
 
@@ -13,6 +13,35 @@ pub struct RequestCtx {
 }
 
 pub type Response = HyperResponse;
+
+pub struct ResponseBuilder;
+
+fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
+    Full::new(chunk.into())
+        .map_err(|never| match never {})
+        .boxed()
+}
+
+impl ResponseBuilder {
+    pub fn with_text<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "text/plain")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    pub fn empty() -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .body(
+                Empty::<Bytes>::new()
+                    .map_err(|never| match never {}) // 处理空错误类型
+                    .boxed(),
+            ) // 转换为BoxBody类型)
+            .unwrap()
+    }
+}
 
 #[async_trait]
 pub trait Handler: Send + Sync + 'static {
@@ -82,13 +111,7 @@ impl Engine {
                                     handler.handle(ctx).await // 调用处理函数并等待结果
                                 } else {
                                     // 路由未找到，返回404 Not Found响应
-                                    let mut not_found = Response::new(
-                                        Empty::<Bytes>::new()
-                                            .map_err(|never| match never {}) // 处理空错误类型
-                                            .boxed(), // 转换为BoxBody类型
-                                    );
-                                    *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
-                                    Ok(not_found)
+                                    Ok(ResponseBuilder::with_text("404 Not Found"))
                                 }
                             }
                         }),

@@ -61,22 +61,56 @@ where
 
 type BoxHandler = Box<dyn Handler>;
 
-type Router = HashMap<String, BoxHandler>;
+struct Router(HashMap<String, BoxHandler>);
+
+impl Router {
+    pub fn new() -> Self {
+        Router(HashMap::new())
+    }
+
+    pub fn add_route(&mut self, key: String, handler: BoxHandler) {
+        self.0.insert(key, handler);
+    }
+
+    pub fn handle(&self, key: &str) -> Option<&BoxHandler> {
+        self.0.get(key)
+    }
+
+    // 新增方法，处理HTTP请求
+    pub async fn handle_request(&self, req: HayperRequest) -> Result<Response, hyper::Error> {
+        // 提取HTTP方法和路径
+        let method = req.method().to_string();
+        let path = req.uri().path().to_string();
+        let key = format!("{}-{}", method, path);
+
+        // 查找对应的路由处理器
+        if let Some(handler) = self.handle(&key) {
+            // 创建请求上下文
+            let ctx = RequestCtx { request: req };
+            // 调用处理函数并等待结果
+            handler.handle(ctx).await
+        } else {
+            // 路由未找到，返回404 Not Found响应
+            Ok(ResponseBuilder::with_text("404 Not Found"))
+        }
+    }
+}
 
 pub struct Engine {
-    routes: Router,
+    router: Router,
 }
 
 impl Engine {
     pub fn new() -> Self {
         Engine {
-            routes: HashMap::new(),
+            router: Router::new(),
         }
     }
 
     pub fn add_route(&mut self, method: &str, path: &str, handler: impl Handler) {
         let key = format!("{}-{}", method, path);
-        self.routes.insert(key, Box::new(handler));
+        let handler = Box::new(handler);
+        self.router.add_route(key, handler);
     }
 
     pub fn get(&mut self, path: &str, handler: impl Handler) {
@@ -87,11 +121,11 @@ impl Engine {
     pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         let addr = addr.parse::<SocketAddr>()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
-        let routes = Arc::new(self.routes);
+        let router = Arc::new(self.router);
         loop {
             let (stream, _) = listener.accept().await?;
             let io = TokioIo::new(stream); // 将TCP流转换为Tokio的IO接口
-            let routes = Arc::clone(&routes); // 克隆路由表的Arc指针以在新任务中使用
+            let router = Arc::clone(&router); // 克隆路由表的Arc指针以在新任务中使用
             tokio::task::spawn(async move {
                 // 启动一个新的异步任务来处理连接
                 if let Err(err) = http1::Builder::new()
@@ -100,20 +134,8 @@ impl Engine {
                         io,
                         service_fn(move |req| {
                             // 创建服务函数来处理每个HTTP请求
-                            let routes = Arc::clone(&routes); // 再次克隆路由表以在请求处理闭包中使用
-                            async move {
-                                let method = req.method().to_string(); // 提取HTTP方法
-                                let path = req.uri().path().to_string(); // 提取请求路径
-                                let key = format!("{}-{}", method, path); // 构建路由键，格式为"METHOD-path"
-                                if let Some(handler) = routes.get(&key) {
-                                    // 查找对应的路由处理器
-                                    let ctx = RequestCtx { request: req }; // 创建请求上下文
-                                    handler.handle(ctx).await // 调用处理函数并等待结果
-                                } else {
-                                    // 路由未找到，返回404 Not Found响应
-                                    Ok(ResponseBuilder::with_text("404 Not Found"))
-                                }
-                            }
+                            let router = Arc::clone(&router); // 再次克隆路由表以在请求处理闭包中使用
+                            async move { router.handle_request(req).await }
                         }),
                     )
                     .await

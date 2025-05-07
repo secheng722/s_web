@@ -148,3 +148,78 @@ impl Engine {
 }
 
 ```
+## day03
+
+context & router 
+
+- context
+  
+```rust
+pub struct ResponseBuilder;
+
+fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
+    Full::new(chunk.into())
+        .map_err(|never| match never {})
+        .boxed()
+}
+
+impl ResponseBuilder {
+    pub fn with_text<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "text/plain")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    pub fn empty() -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .body(
+                Empty::<Bytes>::new()
+                    .map_err(|never| match never {}) // 处理空错误类型
+                    .boxed(),
+            ) // 转换为BoxBody类型)
+            .unwrap()
+    }
+}
+
+```
+- router
+
+```rust
+struct Router(HashMap<String, BoxHandler>);
+
+impl Router {
+    pub fn new() -> Self {
+        Router(HashMap::new())
+    }
+
+    pub fn add_route(&mut self, key: String, handler: BoxHandler) {
+        self.0.insert(key, handler);
+    }
+
+    pub fn handle(&self, key: &str) -> Option<&BoxHandler> {
+        self.0.get(key)
+    }
+
+    // 新增方法，处理HTTP请求
+    pub async fn handle_request(&self, req: HayperRequest) -> Result<Response, hyper::Error> {
+        // 提取HTTP方法和路径
+        let method = req.method().to_string();
+        let path = req.uri().path().to_string();
+        let key = format!("{}-{}", method, path);
+
+        // 查找对应的路由处理器
+        if let Some(handler) = self.handle(&key) {
+            // 创建请求上下文
+            let ctx = RequestCtx { request: req };
+            // 调用处理函数并等待结果
+            handler.handle(ctx).await
+        } else {
+            // 路由未找到，返回404 Not Found响应
+            Ok(ResponseBuilder::with_text("404 Not Found"))
+        }
+    }
+}
+```

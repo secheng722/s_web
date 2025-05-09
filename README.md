@@ -223,3 +223,177 @@ impl Router {
     }
 }
 ```
+
+## day04
+
+前缀树路由
+
+构建tire树 tire.rs
+
+```rust 
+#[derive(Debug)]
+pub struct Node {
+    pub pattern: String,
+    pub part: String,
+    pub children: Vec<Node>,
+    pub iswild: bool,
+}
+
+impl Node {
+    pub fn new() -> Self {
+        Node {
+            pattern: String::new(),
+            part: String::new(),
+            children: Vec::new(),
+            iswild: false,
+        }
+    }
+
+    fn match_child(&mut self, path: &str) -> Option<&mut Node> {
+        self.children
+            .iter_mut()
+            .find(|child| child.part == path || child.iswild)
+    }
+
+    fn match_children(&self, path: &str) -> Vec<&Node> {
+        self.children
+            .iter()
+            .filter(|&child| child.part == path || child.iswild)
+            .collect()
+    }
+
+    pub fn insert(&mut self, pattern: &str, parts: Vec<&str>, height: usize) {
+        if height == parts.len() {
+            self.pattern = pattern.to_string();
+            return;
+        }
+
+        let part = &parts[height];
+        if let Some(child) = self.match_child(part) {
+            child.insert(pattern, parts, height + 1);
+        } else {
+            let mut new_node = Node {
+                pattern: String::new(),
+                part: part.to_string(),
+                children: Vec::new(),
+                iswild: part.starts_with(':') || part.starts_with('*'),
+            };
+            new_node.insert(pattern, parts, height + 1);
+            self.children.push(new_node);
+        }
+    }
+
+    pub fn search(&self, parts: &Vec<&str>, height: usize) -> Option<&Node> {
+        if height == parts.len() || self.part.starts_with("*") {
+            return if self.pattern.is_empty() {
+                None
+            } else {
+                Some(self)
+            };
+        }
+
+        let part = &parts[height];
+        for child in self.match_children(part) {
+            if let Some(result) = child.search(parts, height + 1) {
+                return Some(result);
+            }
+        }
+        None
+    }
+}
+
+```
+
+应用到router router.rs
+
+```rust
+
+
+type HandlerFunc = Box<dyn Handler>;
+
+pub struct Router {
+    roots: HashMap<String, Node>,
+    handlers: HashMap<String, HandlerFunc>,
+}
+
+impl Router {
+    pub fn new() -> Self {
+        Router {
+            roots: HashMap::new(),
+            handlers: HashMap::new(),
+        }
+    }
+
+    //only one * is allowed
+    pub fn parse_pattern(pattern: &str) -> Vec<&str> {
+        let vs = pattern.split('/').collect::<Vec<&str>>();
+        let mut part = Vec::new();
+        for &item in vs.iter() {
+            if !item.is_empty() {
+                part.push(item);
+                if item.starts_with("*") {
+                    break;
+                }
+            }
+        }
+        part
+    }
+
+    pub fn add_route(&mut self, method: &str, pattern: &str, handler: HandlerFunc) {
+        let parts = Self::parse_pattern(pattern);
+        let key = format!("{}-{}", method, pattern);
+        self.roots
+            .entry(method.to_string())
+            .or_insert_with(Node::new)
+            .insert(pattern, parts, 0);
+        self.handlers.insert(key, handler);
+    }
+
+    pub fn get_route(&self, method: &str, path: &str) -> (Option<&Node>, HashMap<String, String>) {
+        let search_parts = Self::parse_pattern(path);
+        let mut params = HashMap::new();
+        let root = self.roots.get(method);
+        if root.is_none() {
+            return (None, HashMap::new());
+        }
+        if let Some(node) = root.unwrap().search(&search_parts, 0) {
+            let parts = Self::parse_pattern(&node.pattern);
+            for (index, ele) in parts.iter().enumerate() {
+                if let Some(param_name) = ele.strip_prefix(':') {
+                    params.insert(param_name.to_string(), search_parts[index].to_string());
+                } else if let Some(param_name) = ele.strip_prefix('*') {
+                    params.insert(param_name.to_string(), search_parts[index..].join("/"));
+                    break;
+                }
+            }
+            return (Some(node), params);
+        }
+        (None, HashMap::new())
+    }
+
+    pub fn handle(&self, key: &str) -> Option<&HandlerFunc> {
+        self.handlers.get(key)
+    }
+
+    // 新增方法，处理HTTP请求
+    pub async fn handle_request(&self, request: HayperRequest) -> Result<Response, hyper::Error> {
+        // 提取HTTP方法和路径
+        let method = request.method().to_string();
+        let path = request.uri().path().to_string();
+        let key = format!("{}-{}", method, path);
+        let (_, params) = self.get_route(&method, &path);
+
+        // 查找对应的路由处理器
+        if let Some(handler) = self.handle(&key) {
+            // 创建请求上下文
+            let ctx = RequestCtx { request, params };
+            // 调用处理函数并等待结果
+            handler.handle(ctx).await
+        } else {
+            // 路由未找到，返回404 Not Found响应
+            Ok(ResponseBuilder::with_text("404 Not Found"))
+        }
+    }
+}
+
+```

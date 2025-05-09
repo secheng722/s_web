@@ -77,9 +77,13 @@ impl Router {
         // 提取HTTP方法和路径
         let method = request.method().to_string();
         let path = request.uri().path().to_string();
-        let key = format!("{}-{}", method, path);
-        let (_, params) = self.get_route(&method, &path);
-
+        let (node, params) = self.get_route(&method, &path);
+        if node.is_none() {
+            // 路由未找到，返回404 Not Found响应
+            return Ok(ResponseBuilder::with_text("404 Not Found"));
+        }
+        let node = node.unwrap();
+        let key = format!("{}-{}", method, node.pattern);
         // 查找对应的路由处理器
         if let Some(handler) = self.handle(&key) {
             // 创建请求上下文

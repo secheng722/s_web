@@ -13,6 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // 添加路由
     engine.get("/", hello);
     engine.get("/hello", hello2);
+    engine.get("/hello/:name", hello_name);
     engine.run("127.0.0.1:3000").await.unwrap();
     Ok(())
 }
@@ -23,4 +24,10 @@ async fn hello(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
 
 async fn hello2(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
     Ok(ResponseBuilder::with_text("hello2"))
+}
+
+async fn hello_name(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
+    Ok(ResponseBuilder::with_text(
+        format!("hello {}", _ctx.params.get("name").unwrap())
+    ))
 }

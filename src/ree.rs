@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
@@ -42,20 +42,19 @@ impl ResponseBuilder {
 
 #[async_trait]
 pub trait Handler: Send + Sync + 'static {
-    async fn handle(&self, ctx: RequestCtx) -> Result<Response, hyper::Error>;
+    async fn handle(&self, ctx: RequestCtx) -> Response;
 }
 
 #[async_trait]
 impl<F: Send + Sync + 'static, Fut> Handler for F
 where
     F: Fn(RequestCtx) -> Fut,
-    Fut: std::future::Future<Output = Result<Response, hyper::Error>> + Send + 'static,
+    Fut: std::future::Future<Output = Response> + Send + 'static,
 {
-    async fn handle(&self, ctx: RequestCtx) -> Result<Response, hyper::Error> {
+    async fn handle(&self, ctx: RequestCtx) -> Response {
         (self)(ctx).await
     }
 }
-
 
 pub struct Engine {
     router: Router,
@@ -95,7 +94,7 @@ impl Engine {
                         service_fn(move |req| {
                             // 创建服务函数来处理每个HTTP请求
                             let router = Arc::clone(&router); // 再次克隆路由表以在请求处理闭包中使用
-                            async move { router.handle_request(req).await }
+                            async move { Ok::<_, Infallible>(router.handle_request(req).await) }
                         }),
                     )
                     .await

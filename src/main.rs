@@ -1,7 +1,7 @@
-mod ree;
-mod tire;
-mod router;
 mod context;
+mod ree;
+mod router;
+mod tire;
 
 use context::RequestCtx;
 use ree::*;
@@ -19,22 +19,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn hello(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
-    Ok(ResponseBuilder::with_text("hello"))
+async fn hello(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::with_text("hello")
 }
 
-async fn hello2(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
-    Ok(ResponseBuilder::with_text("hello2"))
+async fn hello2(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::with_text("hello2")
 }
 
-async fn hello_name(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
-    Ok(ResponseBuilder::with_text(
-        format!("hello {}", _ctx.params.get("name").unwrap())
-    ))
+async fn hello_name(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::with_text(format!("hello {}", _ctx.params.get("name").unwrap()))
 }
 
-async fn hello_path(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
-    Ok(ResponseBuilder::with_text(
-        format!("hello {}", _ctx.params.get("filepath").unwrap())
-    ))
+async fn hello_path(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::with_text(format!("hello {}", _ctx.params.get("filepath").unwrap()))
 }

@@ -73,14 +73,14 @@ impl Router {
     }
 
     // 新增方法，处理HTTP请求
-    pub async fn handle_request(&self, request: HayperRequest) -> Result<Response, hyper::Error> {
+    pub async fn handle_request(&self, request: HayperRequest) -> Response {
         // 提取HTTP方法和路径
         let method = request.method().to_string();
         let path = request.uri().path().to_string();
         let (node, params) = self.get_route(&method, &path);
         if node.is_none() {
             // 路由未找到，返回404 Not Found响应
-            return Ok(ResponseBuilder::with_text("404 Not Found"));
+            return ResponseBuilder::with_text("404 Not Found");
         }
         let node = node.unwrap();
         let key = format!("{}-{}", method, node.pattern);
@@ -92,9 +92,14 @@ impl Router {
             handler.handle(ctx).await
         } else {
             // 路由未找到，返回404 Not Found响应
-            Ok(ResponseBuilder::with_text("404 Not Found"))
+            ResponseBuilder::with_text("404 Not Found")
         }
     }
+}
+
+#[async_trait::async_trait]
+pub trait Middleware: Send + Sync + 'static {
+    fn handle(&self, ctx: RequestCtx) -> Result<Response, hyper::Error>;
 }
 
 #[cfg(test)]
@@ -105,12 +110,16 @@ mod tests {
     #[test]
     fn test_new_router() {
         let mut router = Router::new();
-        router.add_route("GET", "/", Box::new(|_ctx| {
-            async { Ok(ResponseBuilder::with_text("Hello, World!")) }
-        }));
-        router.add_route("GET", "/hello", Box::new(|_ctx| {
-            async { Ok(ResponseBuilder::with_text("Hello!")) }
-        }));
+        router.add_route(
+            "GET",
+            "/",
+            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello, World!") }),
+        );
+        router.add_route(
+            "GET",
+            "/hello",
+            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello!") }),
+        );
         println!("{:?}", router.roots);
     }
 
@@ -124,9 +133,11 @@ mod tests {
     #[test]
     fn test_get_route() {
         let mut router = Router::new();
-        router.add_route("GET", "/p/:lang/doc", Box::new(|_ctx| {
-            async { Ok(ResponseBuilder::with_text("Hello, World!")) }
-        }));
+        router.add_route(
+            "GET",
+            "/p/:lang/doc",
+            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello, World!") }),
+        );
         let (node, params) = router.get_route("GET", "/p/rust/doc");
         assert!(node.is_some());
         assert_eq!(params.get("lang").unwrap(), "rust");

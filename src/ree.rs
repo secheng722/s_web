@@ -1,16 +1,13 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
-use hyper::{Request, body::Bytes, server::conn::http1, service::service_fn};
+use hyper::{body::Bytes, server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
 
-type HayperRequest = Request<hyper::body::Incoming>;
-type HyperResponse = hyper::Response<BoxBody<Bytes, hyper::Error>>;
+use crate::{context::RequestCtx, router::Router};
 
-pub struct RequestCtx {
-    request: HayperRequest,
-}
+type HyperResponse = hyper::Response<BoxBody<Bytes, hyper::Error>>;
 
 pub type Response = HyperResponse;
 
@@ -59,42 +56,6 @@ where
     }
 }
 
-type BoxHandler = Box<dyn Handler>;
-
-struct Router(HashMap<String, BoxHandler>);
-
-impl Router {
-    pub fn new() -> Self {
-        Router(HashMap::new())
-    }
-
-    pub fn add_route(&mut self, key: String, handler: BoxHandler) {
-        self.0.insert(key, handler);
-    }
-
-    pub fn handle(&self, key: &str) -> Option<&BoxHandler> {
-        self.0.get(key)
-    }
-
-    // 新增方法，处理HTTP请求
-    pub async fn handle_request(&self, req: HayperRequest) -> Result<Response, hyper::Error> {
-        // 提取HTTP方法和路径
-        let method = req.method().to_string();
-        let path = req.uri().path().to_string();
-        let key = format!("{}-{}", method, path);
-
-        // 查找对应的路由处理器
-        if let Some(handler) = self.handle(&key) {
-            // 创建请求上下文
-            let ctx = RequestCtx { request: req };
-            // 调用处理函数并等待结果
-            handler.handle(ctx).await
-        } else {
-            // 路由未找到，返回404 Not Found响应
-            Ok(ResponseBuilder::with_text("404 Not Found"))
-        }
-    }
-}
 
 pub struct Engine {
     router: Router,
@@ -107,10 +68,9 @@ impl Engine {
         }
     }
 
-    pub fn add_route(&mut self, method: &str, path: &str, handler: impl Handler) {
-        let key = format!("{}-{}", method, path);
+    pub fn add_route(&mut self, method: &str, pattern: &str, handler: impl Handler) {
         let handler = Box::new(handler);
-        self.router.add_route(key, handler);
+        self.router.add_route(method, pattern, handler);
     }
 
     pub fn get(&mut self, path: &str, handler: impl Handler) {

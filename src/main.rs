@@ -14,6 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     engine.get("/", hello);
     engine.get("/hello", hello2);
     engine.get("/hello/:name", hello_name);
+    engine.get("/assets/*filepath", hello_path);
     engine.run("127.0.0.1:3000").await.unwrap();
     Ok(())
 }
@@ -29,5 +30,11 @@ async fn hello2(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
 async fn hello_name(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
     Ok(ResponseBuilder::with_text(
         format!("hello {}", _ctx.params.get("name").unwrap())
+    ))
+}
+
+async fn hello_path(_ctx: RequestCtx) -> Result<Response, hyper::Error> {
+    Ok(ResponseBuilder::with_text(
+        format!("hello {}", _ctx.params.get("filepath").unwrap())
     ))
 }

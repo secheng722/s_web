@@ -1,4 +1,4 @@
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, hash::Hash, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
@@ -56,15 +56,50 @@ where
     }
 }
 
-pub struct Engine {
+pub struct RouterGroup {
+    prefix: String,
     router: Router,
+    middlewares: Vec<Box<dyn Handler>>,
+}
+
+impl RouterGroup {
+    pub fn add_route(&mut self, method: &str, pattern: &str, handler: impl Handler) {
+        let handler = Box::new(handler);
+        self.router.add_route(method, pattern, handler);
+    }
+
+    pub fn get(&mut self, path: &str, handler: impl Handler) {
+        self.add_route("GET", path, handler);
+    }
+
+    pub fn use_middleware(&mut self, middleware: impl Handler) {
+        let middleware = Box::new(middleware);
+        self.middlewares.push(middleware);
+    }
+}
+
+pub struct Engine {
+    // 不属于任何路由组的路由
+    router: Router,
+    group: HashMap<String, RouterGroup>,
 }
 
 impl Engine {
     pub fn new() -> Self {
         Engine {
             router: Router::new(),
+            group: HashMap::new(),
         }
+    }
+
+    pub fn group(&mut self, prefix: &str) -> &mut RouterGroup {
+        let group = RouterGroup {
+            prefix: prefix.to_string(),
+            router: Router::new(),
+            middlewares: Vec::new(),
+        };
+        self.group.insert(prefix.to_string(), group);
+        self.group.get_mut(prefix).unwrap()
     }
 
     pub fn add_route(&mut self, method: &str, pattern: &str, handler: impl Handler) {
@@ -105,3 +140,17 @@ impl Engine {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_new_group() {
+        let mut engine = Engine::new();
+        let mut group = engine.group("/api");
+        group.prefix = "/1".to_string();
+        println!("{:?}", group.prefix);
+        println!("{:?}", engine.group.get("/api").unwrap().prefix);
+    }
+}   

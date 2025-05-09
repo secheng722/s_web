@@ -404,3 +404,56 @@ impl Router {
 
 ## day05 分组控制
 
+分组控制 将不需要中间件或统一中间件的和分组的分开
+
+```rust
+pub struct RouterGroup {
+    prefix: String,
+    router: Router,
+    middlewares: Vec<Box<dyn Handler>>,
+}
+
+impl RouterGroup {
+    pub fn add_route(&mut self, method: &str, pattern: &str, handler: impl Handler) {
+        let handler = Box::new(handler);
+        self.router.add_route(method, pattern, handler);
+    }
+
+    pub fn get(&mut self, path: &str, handler: impl Handler) {
+        self.add_route("GET", path, handler);
+    }
+
+    pub fn use_middleware(&mut self, middleware: impl Handler) {
+        let middleware = Box::new(middleware);
+        self.middlewares.push(middleware);
+    }
+}
+
+pub struct Engine {
+    // 不属于任何路由组的路由
+    router: Router,
+    group: HashMap<String, RouterGroup>,
+}
+
+impl Engine {
+    pub fn new() -> Self {
+        Engine {
+            router: Router::new(),
+            group: HashMap::new(),
+        }
+    }
+
+    pub fn group(&mut self, prefix: &str) -> &mut RouterGroup {
+        let group = RouterGroup {
+            prefix: prefix.to_string(),
+            router: Router::new(),
+            middlewares: Vec::new(),
+        };
+        self.group.insert(prefix.to_string(), group);
+        self.group.get_mut(prefix).unwrap()
+    }
+}
+
+```
+
+

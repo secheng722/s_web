@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, task::Context};
 
 use crate::{
     context::{HayperRequest, RequestCtx},
@@ -73,21 +73,21 @@ impl Router {
     }
 
     // 新增方法，处理HTTP请求
-    pub async fn handle_request(&self, request: HayperRequest) -> Response {
+    pub async fn handle_request(&self, mut ctx: RequestCtx) -> Response {
         // 提取HTTP方法和路径
-        let method = request.method().to_string();
-        let path = request.uri().path().to_string();
+        let method = ctx.request.method().to_string();
+        let path = ctx.request.uri().path().to_string();
         let (node, params) = self.get_route(&method, &path);
         if node.is_none() {
             // 路由未找到，返回404 Not Found响应
             return ResponseBuilder::with_text("404 Not Found");
         }
+        ctx.params = params;
         let node = node.unwrap();
         let key = format!("{}-{}", method, node.pattern);
         // 查找对应的路由处理器
         if let Some(handler) = self.handle(&key) {
             // 创建请求上下文
-            let ctx = RequestCtx { request, params };
             // 调用处理函数并等待结果
             handler.handle(ctx).await
         } else {

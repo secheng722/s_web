@@ -457,3 +457,75 @@ impl Engine {
 ```
 
 
+## day06 中间件
+
+不分组中间件
+
+```rust
+#[async_trait]
+pub trait Middleware: Send + Sync + 'static {
+    async fn handle(&self, ctx: RequestCtx, next: Next<'_>) -> Response;
+}
+
+pub struct Next<'a> {
+    pub endpoint: &'a dyn Handler,
+    pub next_middleware: &'a [Arc<dyn Middleware>],
+}
+
+impl Next<'_> {
+    pub async fn run(mut self, ctx: RequestCtx) -> Response {
+        if let Some((current, next)) = self.next_middleware.split_first() {
+            self.next_middleware = next;
+            current.handle(ctx, self).await
+        } else {
+            (self.endpoint).handle(ctx).await
+        }
+    }
+}
+
+pub fn use_middleware(&mut self, middleware: impl Middleware) {
+    self.middlewares.push(Arc::new(middleware));
+}
+
+pub struct AccessLog;
+
+#[async_trait]
+impl Middleware for AccessLog {
+    async fn handle(&self, ctx: RequestCtx, next: Next<'_>) -> Response {
+        let start = Instant::now();
+        let method = ctx.request.method().to_string();
+        let path = ctx.request.uri().path().to_string();
+        let res = next.run(ctx).await;
+        println!(
+            "{} {:?} {}  {}ms",
+            method,
+            path,
+            res.status().as_str(),
+            start.elapsed().as_millis()
+        );
+        res
+    }
+}
+
+pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+    //省略代码
+    let middlewares = Arc::clone(&middlewares); // 再次克隆中间件以在请求处理闭包中使用
+    async move {
+        let ctx = RequestCtx {
+            request: req,
+            params: HashMap::new(),
+        };
+
+        let endpoint = Box::new(move |ctx: RequestCtx| {
+            let router = Arc::clone(&router);
+            async move { router.handle_request(ctx).await }
+        });
+        let next = Next {
+            endpoint: &endpoint,
+            next_middleware: &middlewares,
+        };
+        let resp = next.run(ctx).await; // 调用中间件链
+        Ok::<_, Infallible>(resp) // 返回响应
+    }
+}
+```

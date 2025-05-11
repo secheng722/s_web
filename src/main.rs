@@ -10,6 +10,7 @@ use ree::*;
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // 创建一个新的引擎实例
     let mut engine = ree::Engine::new();
+    engine.use_middleware(AccessLog);
     // 添加路由
     engine.get("/", hello);
     engine.get("/hello", hello2);

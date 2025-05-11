@@ -529,3 +529,56 @@ pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 ```
+
+分组中间件
+
+```rust
+
+//将group转换为Arc<RouterGroup>类
+let group = Arc::new(
+    self.group
+        .into_iter()
+        .map(|(k, v)| (k, Arc::new(v)))
+        .collect::<HashMap<_, _>>(),
+);
+
+
+
+        let group = Arc::clone(&group);
+let middlewares = Arc::clone(&middlewares);
+//如果请求的路径以路由组的前缀开头，则使用该路由组
+let group = group
+    .iter()
+    .find(|(_, g)| req.uri().path().starts_with(&g.prefix))
+    .map(|(_, g)| g.clone());
+
+if let Some(group) = group {
+    let group_middlewares = group.middlewares.clone();
+    // 创建合并的中间件列表
+    let mut all_middlewares = Vec::new();
+    // 先添加组特定的中间件
+    all_middlewares.extend(group_middlewares.iter().cloned());
+    // 然后添加全局中间件
+    all_middlewares.extend(middlewares.iter().cloned());
+
+    let ctx = RequestCtx {
+        request: req,
+        params: HashMap::new(),
+    };
+    let endpoint = Box::new(move |ctx: RequestCtx| {
+        let group = Arc::clone(&group);
+        async move { group.handle_request(ctx).await }
+    });
+    //所有的的等于默认的加组的中间件
+
+    // 使用路由组处理请求
+    let next = Next {
+        endpoint: &endpoint,
+        next_middleware: &all_middlewares,
+    };
+
+    let resp = next.run(ctx).await; // 调用中间件链
+    return Ok::<_, Infallible>(resp); // 返回响应
+}
+
+```

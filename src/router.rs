@@ -1,7 +1,7 @@
-use std::{collections::HashMap, task::Context};
+use std::collections::HashMap;
 
 use crate::{
-    context::{HayperRequest, RequestCtx},
+    context::RequestCtx,
     ree::{Handler, Response, ResponseBuilder},
     tire::Node,
 };

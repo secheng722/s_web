@@ -9,14 +9,20 @@ use ree::*;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // 创建一个新的引擎实例
-    let mut engine = ree::Engine::new();
-    engine.use_middleware(AccessLog);
+    let mut r = ree::Engine::new();
+    // r.use_middleware(AccessLog);
     // 添加路由
-    engine.get("/", hello);
-    engine.get("/hello", hello2);
-    engine.get("/hello/:name", hello_name);
-    engine.get("/assets/*filepath", hello_path);
-    engine.run("127.0.0.1:3000").await.unwrap();
+    r.get("/", hello);
+    r.get("/hello", hello2);
+    r.get("/hello/:name", hello_name);
+    r.get("/assets/*filepath", hello_path);
+
+    let api = r.group("/api");
+    api.use_middleware(AccessLog);
+    api.get("/hello", hello);
+    
+
+    r.run("127.0.0.1:3000").await.unwrap();
     Ok(())
 }
 

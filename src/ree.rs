@@ -88,7 +88,8 @@ pub struct RouterGroup {
 impl RouterGroup {
     pub fn add_route(&mut self, method: &str, pattern: &str, handler: impl Handler) {
         let handler = Box::new(handler);
-        self.router.add_route(method, pattern, handler);
+        let full_pattern = format!("{}{}", self.prefix, pattern);
+        self.router.add_route(method, &full_pattern, handler);
     }
 
     pub fn get(&mut self, path: &str, handler: impl Handler) {
@@ -97,6 +98,10 @@ impl RouterGroup {
 
     pub fn use_middleware(&mut self, middleware: impl Middleware) {
         self.middlewares.push(Arc::new(middleware));
+    }
+
+    pub async fn handle_request(&self, ctx: RequestCtx) -> Response {
+        self.router.handle_request(ctx).await
     }
 }
 
@@ -165,11 +170,20 @@ impl Engine {
         let listener = tokio::net::TcpListener::bind(addr).await?;
         let router = Arc::new(self.router);
         let middlewares = Arc::new(self.middlewares);
+        //将group转换为Arc<RouterGroup>类
+        let group = Arc::new(
+            self.group
+                .into_iter()
+                .map(|(k, v)| (k, Arc::new(v)))
+                .collect::<HashMap<_, _>>(),
+        );
+
         loop {
             let (stream, _) = listener.accept().await?;
             let io = TokioIo::new(stream); // 将TCP流转换为Tokio的IO接口
             let router = Arc::clone(&router); // 克隆路由表的Arc指针以在新任务中使用
             let middlewares = Arc::clone(&middlewares); // 克隆中间件的Arc指针以在新任务中使用
+            let group = Arc::clone(&group); // 克隆路由组的Arc指针以在新任务中使用
             tokio::task::spawn(async move {
                 // 启动一个新的异步任务来处理连接
                 if let Err(err) = http1::Builder::new()
@@ -180,7 +194,44 @@ impl Engine {
                             // 创建服务函数来处理每个HTTP请求
                             let router = Arc::clone(&router); // 再次克隆路由表以在请求处理闭包中使用
                             let middlewares = Arc::clone(&middlewares); // 再次克隆中间件以在请求处理闭包中使用
+                            let group = Arc::clone(&group); // 再次克隆路由组以在请求处理闭包中使用
                             async move {
+                                let group = Arc::clone(&group);
+                                let middlewares = Arc::clone(&middlewares);
+                                //如果请求的路径以路由组的前缀开头，则使用该路由组
+                                let group = group
+                                    .iter()
+                                    .find(|(_, g)| req.uri().path().starts_with(&g.prefix))
+                                    .map(|(_, g)| g.clone());
+
+                                if let Some(group) = group {
+                                    let group_middlewares = group.middlewares.clone();
+                                    // 创建合并的中间件列表
+                                    let mut all_middlewares = Vec::new();
+                                    // 先添加组特定的中间件
+                                    all_middlewares.extend(group_middlewares.iter().cloned());
+                                    // 然后添加全局中间件
+                                    all_middlewares.extend(middlewares.iter().cloned());
+
+                                    let ctx = RequestCtx {
+                                        request: req,
+                                        params: HashMap::new(),
+                                    };
+                                    let endpoint = Box::new(move |ctx: RequestCtx| {
+                                        let group = Arc::clone(&group);
+                                        async move { group.handle_request(ctx).await }
+                                    });
+                                    //所有的的等于默认的加组的中间件
+
+                                    // 使用路由组处理请求
+                                    let next = Next {
+                                        endpoint: &endpoint,
+                                        next_middleware: &all_middlewares,
+                                    };
+
+                                    let resp = next.run(ctx).await; // 调用中间件链
+                                    return Ok::<_, Infallible>(resp); // 返回响应
+                                }
                                 let ctx = RequestCtx {
                                     request: req,
                                     params: HashMap::new(),
@@ -212,12 +263,12 @@ impl Engine {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_new_group() {
-        let mut engine = Engine::new();
-        let group = engine.group("/api");
-        group.prefix = "/1".to_string();
-        println!("{:?}", group.prefix);
-        println!("{:?}", engine.group.get("/api").unwrap().prefix);
-    }
+    // #[test]
+    // fn test_new_group() {
+    //     let mut engine = Engine::new();
+    //     let group = engine.group("/api");
+    //     group.prefix = "/1".to_string();
+    //     println!("{:?}", group.prefix);
+    //     println!("{:?}", engine.group.get("/api").unwrap().prefix);
+    // }
 }

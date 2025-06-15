@@ -1,8 +1,0 @@
-[package]
-name = "hello_world"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-ree = { path = "../.." }
-tokio = { version = "1.0", features = ["full"] }

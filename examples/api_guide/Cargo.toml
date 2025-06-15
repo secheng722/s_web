@@ -1,0 +1,9 @@
+[package]
+name = "api_guide"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ree = { path = "../.." }
+tokio = { version = "1.45.1", features = ["full"] }
+serde_json = "1.0"

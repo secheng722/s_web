@@ -1,11 +1,10 @@
-//! HTTP response utilities and builders.
+//! HTTP response utilities and type conversions.
 
 use hyper::body::Bytes;
 use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
 
 pub type Response = hyper::Response<BoxBody<Bytes, hyper::Error>>;
 
-/// Helper function to create a full body
 fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
     Full::new(chunk.into())
         .map_err(|never| match never {})
@@ -16,7 +15,6 @@ fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
 pub struct ResponseBuilder;
 
 impl ResponseBuilder {
-    /// Create a plain text response with UTF-8 encoding
     pub fn with_text<T: Into<Bytes>>(chunk: T) -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::OK)
@@ -25,7 +23,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create a JSON response with UTF-8 encoding
     pub fn with_json<T: Into<Bytes>>(chunk: T) -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::OK)
@@ -34,7 +31,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create an HTML response with UTF-8 encoding
     pub fn with_html<T: Into<Bytes>>(chunk: T) -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::OK)
@@ -43,7 +39,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create an empty response
     pub fn empty() -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::OK)
@@ -55,7 +50,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create a custom response with specified status and content type
     pub fn with_status_and_content_type<T: Into<Bytes>>(
         status: hyper::StatusCode,
         content_type: &str,
@@ -68,7 +62,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create a 404 Not Found response
     pub fn not_found() -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::NOT_FOUND,
@@ -77,7 +70,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 500 Internal Server Error response
     pub fn internal_server_error() -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::INTERNAL_SERVER_ERROR,
@@ -86,7 +78,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 400 Bad Request response with JSON
     pub fn bad_request_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::BAD_REQUEST,
@@ -95,7 +86,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 401 Unauthorized response with JSON
     pub fn unauthorized_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::UNAUTHORIZED,
@@ -104,7 +94,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 403 Forbidden response with JSON
     pub fn forbidden_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::FORBIDDEN,
@@ -113,7 +102,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 429 Too Many Requests response with JSON
     pub fn too_many_requests_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::TOO_MANY_REQUESTS,
@@ -122,7 +110,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 201 Created response with JSON
     pub fn created_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::CREATED,
@@ -131,7 +118,6 @@ impl ResponseBuilder {
         )
     }
 
-    /// Create a 204 No Content response
     pub fn no_content() -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::NO_CONTENT)
@@ -141,5 +127,129 @@ impl ResponseBuilder {
                     .boxed(),
             )
             .unwrap()
+    }
+}
+
+/// Trait for converting types into HTTP responses
+pub trait IntoResponse {
+    fn into_response(self) -> Response;
+}
+
+impl IntoResponse for &str {
+    fn into_response(self) -> Response {
+        ResponseBuilder::with_text(self.to_string())
+    }
+}
+
+impl IntoResponse for String {
+    fn into_response(self) -> Response {
+        ResponseBuilder::with_text(self)
+    }
+}
+
+impl IntoResponse for &String {
+    fn into_response(self) -> Response {
+        ResponseBuilder::with_text(self.clone())
+    }
+}
+
+impl IntoResponse for serde_json::Value {
+    fn into_response(self) -> Response {
+        match serde_json::to_string(&self) {
+            Ok(json_str) => ResponseBuilder::with_json(json_str),
+            Err(_) => ResponseBuilder::internal_server_error(),
+        }
+    }
+}
+
+impl IntoResponse for &serde_json::Value {
+    fn into_response(self) -> Response {
+        match serde_json::to_string(self) {
+            Ok(json_str) => ResponseBuilder::with_json(json_str),
+            Err(_) => ResponseBuilder::internal_server_error(),
+        }
+    }
+}
+
+impl IntoResponse for Vec<u8> {
+    fn into_response(self) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "application/octet-stream")
+            .body(full(self))
+            .unwrap()
+    }
+}
+
+impl IntoResponse for &[u8] {
+    fn into_response(self) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "application/octet-stream")
+            .body(full(self.to_vec()))
+            .unwrap()
+    }
+}
+
+impl IntoResponse for Bytes {
+    fn into_response(self) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "application/octet-stream")
+            .body(full(self))
+            .unwrap()
+    }
+}
+
+impl IntoResponse for () {
+    fn into_response(self) -> Response {
+        ResponseBuilder::no_content()
+    }
+}
+
+impl<T, E> IntoResponse for Result<T, E>
+where
+    T: IntoResponse,
+    E: std::fmt::Display,
+{
+    fn into_response(self) -> Response {
+        match self {
+            Ok(value) => value.into_response(),
+            Err(err) => ResponseBuilder::with_status_and_content_type(
+                hyper::StatusCode::INTERNAL_SERVER_ERROR,
+                "text/plain; charset=utf-8",
+                format!("Error: {}", err),
+            ),
+        }
+    }
+}
+
+impl<T> IntoResponse for Option<T>
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        match self {
+            Some(value) => value.into_response(),
+            None => ResponseBuilder::not_found(),
+        }
+    }
+}
+
+impl<T> IntoResponse for (hyper::StatusCode, T)
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        let (status, content) = self;
+        let mut response = content.into_response();
+        *response.status_mut() = status;
+        response
+    }
+}
+
+impl IntoResponse for Response {
+    fn into_response(self) -> Response {
+        self
     }
 }

@@ -1,6 +1,6 @@
 # Ree HTTP Framework
 
-一个简单的 Rust HTTP 框架，基于 Hyper 构建，灵感来自 Gee 框架的设计思想。
+一个简单高效的 Rust HTTP 框架，基于 Hyper 构建，提供简洁的 API 和强大的类型转换功能。
 
 ## 特性
 
@@ -8,36 +8,101 @@
 - 🛣️ 灵活的路由系统，支持路径参数和通配符
 - 🔧 中间件支持
 - 📦 路由组支持
-- 🎯 简单易用的 API
+- ✨ **自动类型转换** - 支持直接返回 `&str`、`String`、`serde_json::Value` 等类型
+- 🎯 简洁易用的 API 设计
 
 ## 快速开始
 
-### 基本使用
+### 添加依赖
+
+```toml
+[dependencies]
+ree = { git = "https://github.com/your-username/ree.git" }
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"  # 如果需要 JSON 支持
+```
+
+### 简洁的处理器写法（推荐）
 
 ```rust
-use ree::{Engine, ResponseBuilder, RequestCtx};
+use ree::{Engine, handler};
+use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
     
-    app.get("/", hello_handler);
-    app.get("/hello/:name", hello_name_handler);
+    // 直接返回 &str - 自动转换为 text/plain 响应
+    app.get("/hello", handler(|_| async { "Hello, World!" }));
+    
+    // 直接返回 String
+    app.get("/time", handler(|_| async { 
+        format!("Current time: {}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap().as_secs())
+    }));
+    
+    // 直接返回 JSON - 自动转换为 application/json 响应
+    app.get("/json", handler(|_| async { 
+        json!({
+            "message": "Hello JSON",
+            "status": "success"
+        })
+    }));
+    
+    // 使用路径参数
+    app.get("/hello/:name", handler(|ctx| async move {
+        if let Some(name) = ctx.get_param("name") {
+            format!("Hello, {}!", name)
+        } else {
+            "Hello, Anonymous!".to_string()
+        }
+    }));
+    
+    // 返回 Result - 自动处理错误
+    app.get("/result", handler(|_| async {
+        let result: Result<&str, &str> = Ok("Success!");
+        result  // Ok -> 200, Err -> 500
+    }));
+    
+    // 返回 Option - 自动处理 None
+    app.get("/option", handler(|_| async {
+        let data: Option<&str> = Some("Found!");
+        data  // Some -> 200, None -> 404
+    }));
+    
+    // 自定义状态码
+    app.get("/created", handler(|_| async {
+        (ree::StatusCode::CREATED, "Resource created")
+    }));
+    
+    app.run("127.0.0.1:8080").await?;
+    Ok(())
+}
+```
+
+### 高级用法 - 精确控制响应
+
+当需要精确控制响应头、状态码等时，可以直接返回 `Response`：
+
+```rust
+use ree::{Engine, ResponseBuilder, RequestCtx, Response};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = Engine::new();
+    
+    // 精确控制响应
+    app.get("/custom", custom_handler);
     
     app.run("127.0.0.1:8080").await?;
     Ok(())
 }
 
-async fn hello_handler(_ctx: RequestCtx) -> ree::Response {
-    ResponseBuilder::with_text("Hello, World!")
-}
-
-async fn hello_name_handler(ctx: RequestCtx) -> ree::Response {
-    if let Some(name) = ctx.get_param("name") {
-        ResponseBuilder::with_text(format!("Hello, {}!", name))
-    } else {
-        ResponseBuilder::with_text("Hello, Anonymous!")
-    }
+async fn custom_handler(_ctx: RequestCtx) -> Response {
+    let mut response = ResponseBuilder::with_json(r#"{"message": "Custom response"}"#);
+    response.headers_mut().insert("X-Custom-Header", "MyValue".parse().unwrap());
+    response
 }
 ```
 

@@ -1,4 +1,6 @@
-#[derive(Default,Debug)]
+//! Trie data structure for efficient route matching.
+
+#[derive(Default, Debug)]
 pub struct Node {
     pub pattern: String,
     pub part: String,
@@ -8,12 +10,7 @@ pub struct Node {
 
 impl Node {
     pub fn new() -> Self {
-        Node {
-            pattern: String::new(),
-            part: String::new(),
-            children: Vec::new(),
-            iswild: false,
-        }
+        Node::default()
     }
 
     fn match_child(&mut self, path: &str) -> Option<&mut Node> {
@@ -50,8 +47,8 @@ impl Node {
         }
     }
 
-    pub fn search(&self, parts: &Vec<&str>, height: usize) -> Option<&Node> {
-        if height == parts.len() || self.part.starts_with("*") {
+    pub fn search(&self, parts: &[&str], height: usize) -> Option<&Node> {
+        if height == parts.len() || self.part.starts_with('*') {
             return if self.pattern.is_empty() {
                 None
             } else {
@@ -75,20 +72,24 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut root = Node {
-            pattern: String::new(),
-            part: String::new(),
-            children: Vec::new(),
-            iswild: false,
-        };
-
+        let mut root = Node::new();
         root.insert("/p/:lang/doc", vec!["p", ":lang", "doc"], 0);
+        
         assert_eq!(root.children.len(), 1);
         assert_eq!(root.children[0].part, "p");
         assert!(!root.children[0].iswild);
         assert_eq!(root.children[0].children.len(), 1);
         assert_eq!(root.children[0].children[0].part, ":lang");
         assert!(root.children[0].children[0].iswild);
-        println!("{:?}", root);
+    }
+
+    #[test]
+    fn test_search() {
+        let mut root = Node::new();
+        root.insert("/p/:lang/doc", vec!["p", ":lang", "doc"], 0);
+        
+        let result = root.search(&["p", "rust", "doc"], 0);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().pattern, "/p/:lang/doc");
     }
 }

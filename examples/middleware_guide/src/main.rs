@@ -49,6 +49,100 @@ fn auth(token: &'static str) -> MiddlewareFn {
     })
 }
 
+/// 🚀 JWT 认证中间件（简化版本，用于演示）
+fn jwt_auth(secret: &'static str) -> MiddlewareFn {
+    middleware(move |ctx, next| async move {
+        // 从 Authorization header 获取 JWT token
+        if let Some(auth_header) = ctx.request.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                    // 简化的JWT验证逻辑（实际项目中应使用专业的JWT库如jsonwebtoken）
+                    if validate_jwt_token(token, secret) {
+                        println!("✅ JWT认证成功: {}", extract_user_from_token(token));
+                        return next(ctx).await;
+                    }
+                }
+            }
+        }
+        
+        ResponseBuilder::unauthorized_json(r#"{"error": "Invalid or missing JWT token"}"#)
+    })
+}
+
+/// 简化的JWT验证函数（仅用于演示）
+fn validate_jwt_token(token: &str, _secret: &str) -> bool {
+    // 这里是一个简化的验证逻辑
+    // 实际项目中应该：
+    // 1. 解析JWT的header、payload、signature
+    // 2. 验证签名
+    // 3. 检查过期时间
+    // 4. 验证issuer、audience等claim
+    
+    // 演示：假设token格式为 "user.role.timestamp"
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() == 3 {
+        // 简单检查：用户名不为空，角色有效，时间戳不太旧
+        let user = parts[0];
+        let role = parts[1];
+        let timestamp = parts[2].parse::<u64>().unwrap_or(0);
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        !user.is_empty() && 
+        (role == "admin" || role == "user") && 
+        (current_time - timestamp) < 3600 // 1小时内有效
+    } else {
+        false
+    }
+}
+
+/// 从JWT token中提取用户信息（简化版本）
+fn extract_user_from_token(token: &str) -> String {
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() == 3 {
+        format!("{}({})", parts[0], parts[1])
+    } else {
+        "unknown".to_string()
+    }
+}
+
+/// 🚀 JWT 权限检查中间件
+fn jwt_require_role(required_role: &'static str) -> MiddlewareFn {
+    middleware(move |ctx, next| async move {
+        // 这个中间件应该在 jwt_auth 之后使用
+        // 从 Authorization header 获取并解析角色
+        if let Some(auth_header) = ctx.request.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                    let parts: Vec<&str> = token.split('.').collect();
+                    if parts.len() == 3 {
+                        let role = parts[1];
+                        if role == required_role || role == "admin" { // admin有所有权限
+                            return next(ctx).await;
+                        }
+                    }
+                }
+            }
+        }
+        
+        ResponseBuilder::forbidden_json(format!(
+            r#"{{"error": "Access denied. Required role: {}"}}"#, 
+            required_role
+        ))
+    })
+}
+
+/// 生成简化的JWT token（仅用于演示）
+fn generate_demo_jwt_token(user: &str, role: &str) -> String {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    format!("{}.{}.{}", user, role, timestamp)
+}
+
 /// 🚀 请求计数器中间件
 fn request_counter() -> MiddlewareFn {
     let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -269,8 +363,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // 6. 基础路由（不需要认证）
-    println!("6️⃣ 基础路由（应用全局中间件）");
+    // 6. JWT 认证路由组演示
+    println!("6️⃣ JWT 认证路由组");
+    {
+        let mut jwt_group = app.group("/jwt");
+        
+        // JWT认证中间件
+        jwt_group.use_middleware(jwt_auth("my-secret-key"));
+        
+        // JWT路由
+        jwt_group.get("/profile", |_ctx: RequestCtx| async move {
+            json!({
+                "message": "用户个人资料",
+                "user": "从JWT token中解析的用户信息",
+                "auth_method": "JWT"
+            })
+        });
+
+        jwt_group.get("/dashboard", |_ctx: RequestCtx| async move {
+            json!({
+                "message": "用户仪表板",
+                "data": ["图表1", "图表2", "图表3"],
+                "auth_method": "JWT"
+            })
+        });
+    }
+
+    // 7. JWT + 角色权限路由组演示
+    println!("7️⃣ JWT + 角色权限路由组");
+    {
+        let mut admin_group = app.group("/admin");
+        
+        // JWT认证 + 管理员角色要求
+        admin_group.use_middleware(jwt_auth("my-secret-key"));
+        admin_group.use_middleware(jwt_require_role("admin"));
+        
+        admin_group.get("/users", |_ctx: RequestCtx| async move {
+            json!({
+                "message": "管理员：用户列表",
+                "users": [
+                    {"id": 1, "name": "Alice", "role": "admin"},
+                    {"id": 2, "name": "Bob", "role": "user"},
+                    {"id": 3, "name": "Charlie", "role": "user"}
+                ],
+                "auth_method": "JWT + Role"
+            })
+        });
+
+        admin_group.post("/users", |_ctx: RequestCtx| async move {
+            json!({
+                "message": "管理员：创建用户成功",
+                "auth_method": "JWT + Role"
+            })
+        });
+    }
+
+    // 8. JWT Token生成端点（用于测试）
+    app.post("/auth/login", |_ctx: RequestCtx| async move {
+        // 在实际项目中，这里应该验证用户名密码
+        let admin_token = generate_demo_jwt_token("alice", "admin");
+        let user_token = generate_demo_jwt_token("bob", "user");
+        
+        json!({
+            "message": "登录成功（演示）",
+            "tokens": {
+                "admin": admin_token,
+                "user": user_token
+            },
+            "usage": {
+                "header": "Authorization: Bearer <token>",
+                "endpoints": {
+                    "jwt_protected": "/jwt/profile, /jwt/dashboard",
+                    "admin_only": "/admin/users"
+                }
+            }
+        })
+    });
+
+    // 9. 基础路由（不需要认证）
+    println!("9️⃣ 基础路由（应用全局中间件）");
     
     app.get("/", |_: RequestCtx| async {
         json!({
@@ -288,7 +459,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "计时器",
                 "请求计数",
                 "CORS",
-                "认证",
+                "简单认证",
+                "JWT认证", 
+                "角色权限",
                 "限流",
                 "错误处理"
             ]
@@ -334,8 +507,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  GET  /api/users         - 需要认证 (Bearer secret-token)");
     println!("  POST /api/users         - 需要认证 (Bearer secret-token)");
     println!("  GET  /api/stats         - API统计信息");
-    println!("\n💡 测试认证API:");
+    println!("  POST /auth/login        - 获取JWT token（演示）");
+    println!("  GET  /jwt/profile       - JWT认证用户信息");
+    println!("  GET  /jwt/dashboard     - JWT认证仪表板");
+    println!("  GET  /admin/users       - 管理员用户列表（需要admin角色）");
+    println!("  POST /admin/users       - 管理员创建用户（需要admin角色）");
+    println!("\n💡 测试简单认证API:");
     println!("  curl -H 'Authorization: Bearer secret-token' http://127.0.0.1:3000/api/users");
+    println!("\n🔐 测试JWT认证:");
+    println!("  1. 获取token: curl -X POST http://127.0.0.1:3000/auth/login");
+    println!("  2. 使用token: curl -H 'Authorization: Bearer <admin_token>' http://127.0.0.1:3000/jwt/profile");
+    println!("  3. 管理员API: curl -H 'Authorization: Bearer <admin_token>' http://127.0.0.1:3000/admin/users");
+    println!("  4. 普通用户API: curl -H 'Authorization: Bearer <user_token>' http://127.0.0.1:3000/jwt/dashboard");
     println!("\n🔍 测试限流:");
     println!("  快速发送多个请求观察限流效果");
 

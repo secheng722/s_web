@@ -25,7 +25,15 @@ impl ResponseBuilder {
     pub fn with_text<T: Into<Bytes>>(chunk: T) -> Response {
         hyper::Response::builder()
             .status(hyper::StatusCode::OK)
-            .header("Content-Type", "text/plain")
+            .header("Content-Type", "text/plain; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    pub fn with_json<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "application/json; charset=utf-8")
             .body(full(chunk))
             .unwrap()
     }
@@ -124,7 +132,7 @@ impl Middleware for AccessLog {
         res
     }
 }
-
+#[derive(Default)]
 pub struct Engine {
     // 不属于任何路由组的路由
     router: Router,
@@ -263,12 +271,12 @@ impl Engine {
 mod test {
     use super::*;
 
-    // #[test]
-    // fn test_new_group() {
-    //     let mut engine = Engine::new();
-    //     let group = engine.group("/api");
-    //     group.prefix = "/1".to_string();
-    //     println!("{:?}", group.prefix);
-    //     println!("{:?}", engine.group.get("/api").unwrap().prefix);
-    // }
+    #[test]
+    fn test_new_group() {
+        let mut engine = Engine::new();
+        let group = engine.group("/api");
+        group.prefix = "/1".to_string();
+        println!("{:?}", group.prefix);
+        println!("{:?}", engine.group.get("/api").unwrap().prefix);
+    }
 }

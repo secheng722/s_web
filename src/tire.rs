@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Default,Debug)]
 pub struct Node {
     pub pattern: String,
     pub part: String,

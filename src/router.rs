@@ -8,6 +8,7 @@ use crate::{
 
 type HandlerFunc = Box<dyn Handler>;
 
+#[derive(Default)]
 pub struct Router {
     roots: HashMap<String, Node>,
     handlers: HashMap<String, HandlerFunc>,
@@ -41,7 +42,7 @@ impl Router {
         let key = format!("{}-{}", method, pattern);
         self.roots
             .entry(method.to_string())
-            .or_insert_with(Node::new)
+            .or_default()
             .insert(pattern, parts, 0);
         self.handlers.insert(key, handler);
     }

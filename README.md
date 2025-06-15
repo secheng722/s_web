@@ -1,4 +1,113 @@
-# ree 基于gee同样思想的web 框架
+# Ree HTTP Framework
+
+一个简单的 Rust HTTP 框架，基于 Hyper 构建，灵感来自 Gee 框架的设计思想。
+
+## 特性
+
+- 🚀 基于 Tokio 的异步处理
+- 🛣️ 灵活的路由系统，支持路径参数和通配符
+- 🔧 中间件支持
+- 📦 路由组支持
+- 🎯 简单易用的 API
+
+## 快速开始
+
+### 基本使用
+
+```rust
+use ree::{Engine, ResponseBuilder, RequestCtx};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = Engine::new();
+    
+    app.get("/", hello_handler);
+    app.get("/hello/:name", hello_name_handler);
+    
+    app.run("127.0.0.1:8080").await?;
+    Ok(())
+}
+
+async fn hello_handler(_ctx: RequestCtx) -> ree::Response {
+    ResponseBuilder::with_text("Hello, World!")
+}
+
+async fn hello_name_handler(ctx: RequestCtx) -> ree::Response {
+    if let Some(name) = ctx.get_param("name") {
+        ResponseBuilder::with_text(format!("Hello, {}!", name))
+    } else {
+        ResponseBuilder::with_text("Hello, Anonymous!")
+    }
+}
+```
+
+### 中间件
+
+```rust
+use ree::{Engine, AccessLog};
+
+let mut app = Engine::new();
+app.use_middleware(AccessLog);
+```
+
+### 路由组
+
+```rust
+let api_group = app.group("/api");
+api_group.get("/users", get_users_handler);
+api_group.get("/users/:id", get_user_by_id_handler);
+```
+
+## 运行示例
+
+```bash
+cargo run --example hello_world
+```
+
+然后访问：
+- http://127.0.0.1:8080/ - 基本问候
+- http://127.0.0.1:8080/hello/张三 - 带参数的问候
+- http://127.0.0.1:8080/api/users - 获取用户列表
+- http://127.0.0.1:8080/api/users/1 - 获取特定用户
+
+## API 文档
+
+### Engine
+
+主要的应用程序结构，用于配置路由和中间件。
+
+#### 方法
+
+- `new()` - 创建新的 Engine 实例
+- `get(path, handler)` - 添加 GET 路由
+- `group(prefix)` - 创建路由组
+- `use_middleware(middleware)` - 添加中间件
+- `run(addr)` - 启动服务器
+
+### ResponseBuilder
+
+用于构建 HTTP 响应的工具。
+
+#### 方法
+
+- `with_text(content)` - 创建文本响应
+- `empty()` - 创建空响应
+
+### RequestCtx
+
+请求上下文，包含请求信息和路径参数。
+
+#### 方法
+
+- `get_param(key)` - 获取路径参数
+
+## 许可证
+
+MIT License
+
+---
+
+## 开发历程 (基于 Gee 框架的思想)
 
 ## day01
 

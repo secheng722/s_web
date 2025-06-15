@@ -1,105 +1,45 @@
-//! Middleware trait and built-in middleware implementations.
+//! 简化的函数式中间件系统
 
-use std::{sync::Arc, time::Instant};
-use async_trait::async_trait;
-use crate::{RequestCtx, Response, Handler};
+use std::{sync::Arc, future::Future, pin::Pin};
+use crate::{RequestCtx, Response};
 
-/// Trait for middleware components
-#[async_trait]
-pub trait Middleware: Send + Sync + 'static {
-    async fn handle(&self, ctx: RequestCtx, next: Next<'_>) -> Response;
+/// 中间件函数类型
+pub type MiddlewareFn = Arc<dyn Fn(RequestCtx, MiddlewareNext) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+
+/// 下一个处理器的类型
+pub type MiddlewareNext = Arc<dyn Fn(RequestCtx) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+
+/// 执行中间件链的函数
+pub fn execute_middleware_chain(
+    middlewares: &[MiddlewareFn],
+    endpoint: MiddlewareNext,
+    ctx: RequestCtx,
+) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+    if middlewares.is_empty() {
+        return endpoint(ctx);
+    }
+    
+    let (first, rest) = middlewares.split_first().unwrap();
+    let next = create_next_fn(rest, endpoint);
+    first(ctx, next)
 }
 
-/// Represents the next handler in the middleware chain
-pub struct Next<'a> {
-    pub endpoint: &'a dyn Handler,
-    pub next_middleware: &'a [Arc<dyn Middleware>],
+/// 创建下一个处理器函数
+fn create_next_fn(
+    remaining_middlewares: &[MiddlewareFn],
+    endpoint: MiddlewareNext,
+) -> MiddlewareNext {
+    let remaining = remaining_middlewares.to_vec();
+    Arc::new(move |ctx| {
+        execute_middleware_chain(&remaining, endpoint.clone(), ctx)
+    })
 }
 
-impl Next<'_> {
-    /// Execute the next middleware or handler in the chain
-    pub async fn run(mut self, ctx: RequestCtx) -> Response {
-        if let Some((current, next)) = self.next_middleware.split_first() {
-            self.next_middleware = next;
-            current.handle(ctx, self).await
-        } else {
-            self.endpoint.handle(ctx).await
-        }
-    }
-}
-
-/// Built-in access logging middleware
-pub struct AccessLog;
-
-#[async_trait]
-impl Middleware for AccessLog {
-    async fn handle(&self, ctx: RequestCtx, next: Next<'_>) -> Response {
-        let start = Instant::now();
-        let method = ctx.request.method().to_string();
-        let path = ctx.request.uri().path().to_string();
-        
-        let response = next.run(ctx).await;
-        
-        println!(
-            "{} {} {} {}ms",
-            method,
-            path,
-            response.status().as_str(),
-            start.elapsed().as_millis()
-        );
-        
-        response
-    }
-}
-
-/// CORS middleware
-pub struct Cors {
-    allow_origin: String,
-    allow_methods: String,
-    allow_headers: String,
-}
-
-impl Cors {
-    pub fn new() -> Self {
-        Self {
-            allow_origin: "*".to_string(),
-            allow_methods: "GET, POST, PUT, DELETE, OPTIONS".to_string(),
-            allow_headers: "Content-Type, Authorization".to_string(),
-        }
-    }
-
-    pub fn allow_origin(mut self, origin: &str) -> Self {
-        self.allow_origin = origin.to_string();
-        self
-    }
-
-    pub fn allow_methods(mut self, methods: &str) -> Self {
-        self.allow_methods = methods.to_string();
-        self
-    }
-
-    pub fn allow_headers(mut self, headers: &str) -> Self {
-        self.allow_headers = headers.to_string();
-        self
-    }
-}
-
-impl Default for Cors {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl Middleware for Cors {
-    async fn handle(&self, ctx: RequestCtx, next: Next<'_>) -> Response {
-        let mut response = next.run(ctx).await;
-        
-        let headers = response.headers_mut();
-        headers.insert("Access-Control-Allow-Origin", self.allow_origin.parse().unwrap());
-        headers.insert("Access-Control-Allow-Methods", self.allow_methods.parse().unwrap());
-        headers.insert("Access-Control-Allow-Headers", self.allow_headers.parse().unwrap());
-        
-        response
-    }
+/// 创建中间件的便利函数
+pub fn middleware<F, Fut>(f: F) -> MiddlewareFn
+where
+    F: Fn(RequestCtx, MiddlewareNext) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Response> + Send + 'static,
+{
+    Arc::new(move |ctx, next| Box::pin(f(ctx, next)))
 }

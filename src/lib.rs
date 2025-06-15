@@ -79,7 +79,7 @@ pub use engine::Engine;
 pub use handler::Handler;
 
 /// Middleware system
-pub use middleware::{AccessLog, Cors, Middleware, Next};
+pub use middleware::{MiddlewareFn, MiddlewareNext, execute_middleware_chain, middleware};
 
 /// Response types and builders
 pub use response::{IntoResponse, Response, ResponseBuilder};

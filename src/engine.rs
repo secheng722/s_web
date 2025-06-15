@@ -14,16 +14,17 @@ use crate::{
     RequestCtx, 
     Response, 
     Handler, 
-    Middleware, 
-    Next, 
-    Router
+    Router,
+    MiddlewareFn,
+    MiddlewareNext,
+    execute_middleware_chain,
 };
 
 /// A group of routes with shared prefix and middleware
 pub struct RouterGroup {
     prefix: String,
     router: Router,
-    middlewares: Vec<Arc<dyn Middleware>>,
+    middlewares: Vec<MiddlewareFn>,
 }
 
 impl RouterGroup {
@@ -63,8 +64,8 @@ impl RouterGroup {
     }
 
     /// Add middleware to this group
-    pub fn use_middleware(&mut self, middleware: impl Middleware) {
-        self.middlewares.push(Arc::new(middleware));
+    pub fn use_middleware(&mut self, middleware: MiddlewareFn) {
+        self.middlewares.push(middleware);
     }
 
     /// Handle a request using this group's router
@@ -77,7 +78,7 @@ impl RouterGroup {
 pub struct Engine {
     router: Router,
     groups: HashMap<String, RouterGroup>,
-    middlewares: Vec<Arc<dyn Middleware>>,
+    middlewares: Vec<MiddlewareFn>,
 }
 
 impl Engine {
@@ -91,8 +92,8 @@ impl Engine {
     }
 
     /// Add global middleware
-    pub fn use_middleware(&mut self, middleware: impl Middleware) {
-        self.middlewares.push(Arc::new(middleware));
+    pub fn use_middleware(&mut self, middleware: MiddlewareFn) {
+        self.middlewares.push(middleware);
     }
 
     /// Create a route group with the given prefix
@@ -170,37 +171,30 @@ impl Engine {
                                 };
 
                                 if let Some(group) = group {
-                                    // Use group-specific handler
+                                    // Use group-specific handler with combined middleware
                                     let mut all_middlewares = Vec::new();
-                                    all_middlewares.extend(group.middlewares.iter().cloned());
+                                    // 首先应用全局中间件
                                     all_middlewares.extend(middlewares.iter().cloned());
+                                    // 然后应用组中间件
+                                    all_middlewares.extend(group.middlewares.iter().cloned());
 
-                                    let endpoint = Box::new(move |ctx: RequestCtx| {
+                                    // 创建组的端点处理器
+                                    let endpoint: MiddlewareNext = Arc::new(move |ctx| {
                                         let group = Arc::clone(&group);
-                                        async move { group.handle_request(ctx).await }
+                                        Box::pin(async move { group.handle_request(ctx).await })
                                     });
 
-                                    let next = Next {
-                                        endpoint: &endpoint,
-                                        next_middleware: &all_middlewares,
-                                    };
-
-                                    let resp = next.run(ctx).await;
+                                    let resp = execute_middleware_chain(&all_middlewares, endpoint, ctx).await;
                                     return Ok::<_, Infallible>(resp);
                                 }
 
-                                // Use main router
-                                let endpoint = Box::new(move |ctx: RequestCtx| {
+                                // Use main router with global middleware
+                                let endpoint: MiddlewareNext = Arc::new(move |ctx| {
                                     let router = Arc::clone(&router);
-                                    async move { router.handle_request(ctx).await }
+                                    Box::pin(async move { router.handle_request(ctx).await })
                                 });
                                 
-                                let next = Next {
-                                    endpoint: &endpoint,
-                                    next_middleware: &middlewares,
-                                };
-                                
-                                let resp = next.run(ctx).await;
+                                let resp = execute_middleware_chain(&middlewares, endpoint, ctx).await;
                                 Ok::<_, Infallible>(resp)
                             }
                         }),

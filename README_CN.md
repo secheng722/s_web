@@ -17,7 +17,7 @@
 
 ```toml
 [dependencies]
-ree = { git = "https://github.com/your-username/ree.git" }
+ree = { git = "https://github.com/secheng722/ree" }
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"  # 如果需要 JSON 支持
 ```

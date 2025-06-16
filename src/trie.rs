@@ -9,6 +9,7 @@ pub struct Node {
 }
 
 impl Node {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Node::default()
     }

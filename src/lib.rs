@@ -1,5 +1,5 @@
 // =============================================================================
-// Module Declarations
+// Internal Module Declarations
 // =============================================================================
 
 mod context;
@@ -11,44 +11,37 @@ mod router;
 mod trie;
 
 // =============================================================================
-// Core Exports
+// Internal System Imports (not exposed to users)
 // =============================================================================
 
-/// Request context and parameter handling
-pub use context::RequestCtx;
+// These are used internally by the framework
+use handler::Handler;
+use middleware::{Middleware, execute_chain};
+use router::Router;
+// =============================================================================
+// Public API Exports
+// =============================================================================
 
-/// Main HTTP engine for building applications
+pub use context::RequestCtx;
+/// Core framework components
 pub use engine::Engine;
 
-/// Handler trait and helper functions
-pub use handler::Handler;
+/// Response handling
+pub use response::{IntoResponse, Response, ResponseBuilder};
 
 /// Middleware system
-pub use middleware::{Middleware, Next, execute_chain};
+pub use middleware::Next;
 
-/// Response types and builders
-pub use response::{ResponseBuilder, IntoResponse, Response, full, empty};
-
-/// Internal router (typically not needed for end users)
-pub use router::Router;
-
-// =============================================================================
-// Macro Exports
-// =============================================================================
-
-// Middleware macro support -allows parameterized middleware to be written in concise async fn form
+/// Macro support
 pub use ree_macros::middleware;
 
 // =============================================================================
-// Re-exports from Dependencies
+// Advanced/Internal API Exports
 // =============================================================================
 
-/// Re-export common HTTP status codes for convenience
+// =============================================================================
+// Convenient Re-exports
+// =============================================================================
+
+/// HTTP status codes for convenience
 pub use hyper::StatusCode;
-
-// =============================================================================
-// Advanced Exports
-// =============================================================================
-
-/// Trie data structure (for advanced routing customization)
-pub use trie::Node;

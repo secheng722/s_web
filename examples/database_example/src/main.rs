@@ -1,10 +1,10 @@
+use chrono::{DateTime, Utc};
 use ree::{Engine, RequestCtx, ResponseBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::{SqlitePool, Row};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use sqlx::{Row, SqlitePool};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct User {
@@ -48,15 +48,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 添加CORS中间件（简单版本）
     app.use_middleware(|ctx, next| async move {
         let mut response = next(ctx).await;
-        response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-        response.headers_mut().insert("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE".parse().unwrap());
-        response.headers_mut().insert("Access-Control-Allow-Headers", "Content-Type".parse().unwrap());
+        response
+            .headers_mut()
+            .insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+        response.headers_mut().insert(
+            "Access-Control-Allow-Methods",
+            "GET, POST, PUT, DELETE".parse().unwrap(),
+        );
+        response.headers_mut().insert(
+            "Access-Control-Allow-Headers",
+            "Content-Type".parse().unwrap(),
+        );
         response
     });
 
+    app.use_middleware(|ctx: RequestCtx, next: ree::Next| logging("prefix", ctx, next));
+
     // 创建API路由组
     let api = app.group("/api/v1");
-    
+
     // 用户CRUD端点
     api.get("/users", {
         let state = state.clone();
@@ -138,27 +148,27 @@ async fn init_database() -> Result<SqlitePool, sqlx::Error> {
     // 获取当前工作目录并构建数据库路径
     let current_dir = std::env::current_dir()
         .map_err(|e| sqlx::Error::Configuration(format!("无法获取当前目录: {}", e).into()))?;
-    
+
     let db_path = current_dir.join("database.db");
-    
+
     // 添加 create 参数以允许创建数据库文件
     let db_url = format!("sqlite:{}?mode=rwc", db_path.to_string_lossy());
-    
+
     println!("📁 数据库路径: {}", db_path.display());
-    
+
     // 确保数据库文件的父目录存在
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库目录: {}", e).into()))?;
     }
-    
+
     // 如果数据库文件不存在，创建一个空文件
     if !db_path.exists() {
         std::fs::File::create(&db_path)
             .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库文件: {}", e).into()))?;
         println!("✅ 创建新的数据库文件: {}", db_path.display());
     }
-    
+
     // 创建数据库连接池
     let pool = SqlitePool::connect(&db_url).await?;
 
@@ -182,10 +192,11 @@ async fn init_database() -> Result<SqlitePool, sqlx::Error> {
 
 // 获取所有用户
 async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
-    let rows = sqlx::query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
-        .fetch_all(&state.db)
-        .await
-        .map_err(|e| format!("数据库查询错误: {}", e))?;
+    let rows =
+        sqlx::query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
+            .fetch_all(&state.db)
+            .await
+            .map_err(|e| format!("数据库查询错误: {}", e))?;
 
     let users: Vec<User> = rows
         .into_iter()
@@ -193,7 +204,10 @@ async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
             id: row.get("id"),
             name: row.get("name"),
             email: row.get("email"),
-            created_at: row.get::<String, _>("created_at").parse().unwrap_or(Utc::now()),
+            created_at: row
+                .get::<String, _>("created_at")
+                .parse()
+                .unwrap_or(Utc::now()),
         })
         .collect();
 
@@ -206,22 +220,19 @@ async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
 
 // 创建新用户
 async fn create_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
-    let req: CreateUserRequest = ctx.json()
-        .map_err(|e| format!("请求体解析错误: {}", e))?;
+    let req: CreateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {}", e))?;
 
     let user_id = Uuid::new_v4().to_string();
     let created_at = Utc::now();
 
-    sqlx::query(
-        "INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)"
-    )
-    .bind(&user_id)
-    .bind(&req.name)
-    .bind(&req.email)
-    .bind(created_at.to_rfc3339())
-    .execute(&state.db)
-    .await
-    .map_err(|e| format!("创建用户失败: {}", e))?;
+    sqlx::query("INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)")
+        .bind(&user_id)
+        .bind(&req.name)
+        .bind(&req.email)
+        .bind(created_at.to_rfc3339())
+        .execute(&state.db)
+        .await
+        .map_err(|e| format!("创建用户失败: {}", e))?;
 
     let user = User {
         id: user_id,
@@ -253,7 +264,10 @@ async fn get_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value,
                 id: row.get("id"),
                 name: row.get("name"),
                 email: row.get("email"),
-                created_at: row.get::<String, _>("created_at").parse().unwrap_or(Utc::now()),
+                created_at: row
+                    .get::<String, _>("created_at")
+                    .parse()
+                    .unwrap_or(Utc::now()),
             };
 
             Ok(json!({
@@ -268,8 +282,7 @@ async fn get_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value,
 // 更新用户
 async fn update_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
     let user_id = ctx.get_param("id").ok_or("缺少用户ID参数")?;
-    let req: UpdateUserRequest = ctx.json()
-        .map_err(|e| format!("请求体解析错误: {}", e))?;
+    let req: UpdateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {}", e))?;
 
     // 检查用户是否存在
     let existing = sqlx::query("SELECT id FROM users WHERE id = ?")
@@ -335,4 +348,47 @@ async fn delete_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Val
         "success": true,
         "message": "用户删除成功"
     }))
+}
+
+// 中间件函数实现 - 直接调用模式
+
+async fn logging(prefix: &str, ctx: RequestCtx, next: ree::Next) -> ree::Response {
+    let start = std::time::Instant::now();
+    let method = ctx.method().to_string();
+    let path = ctx.path().to_string();
+
+    println!("[{}] {} {} - 开始处理", prefix, method, path);
+
+    let response = next(ctx).await;
+    let duration = start.elapsed();
+
+    println!("[{}] {} {} - 完成 ({:?})", prefix, method, path, duration);
+    response
+}
+
+async fn auth_check(required_role: &str, ctx: RequestCtx, next: ree::Next) -> ree::Response {
+    let auth_header = ctx.get_header("Authorization");
+
+    if auth_header.is_none() {
+        println!("🚫 认证失败: 需要 {} 角色", required_role);
+        return ResponseBuilder::new()
+            .status(StatusCode::UNAUTHORIZED)
+            .json(json!({
+                "error": "需要认证",
+                "required_role": required_role
+            }));
+    }
+
+    println!("✅ {} 角色认证通过", required_role);
+    next(ctx).await
+}
+
+async fn rate_limit(max_requests: u32, ctx: RequestCtx, next: ree::Next) -> ree::Response {
+    // 简单的模拟限流检查
+    println!("🚦 限流检查: 最大 {} 请求/分钟", max_requests);
+
+    // 这里可以实现真正的限流逻辑
+    // 比如检查 Redis 中的计数器等
+
+    next(ctx).await
 }

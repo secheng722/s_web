@@ -1,85 +1,58 @@
-use ree::{middleware, Engine, Next, RequestCtx, Response, ResponseBuilder};
+use ree::{Engine, Next, RequestCtx, Response, ResponseBuilder};
 use serde_json::json;
-use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
+use std::{future::Future, sync::Arc, time::Instant};
 
 // =============================================================================
-// 🎉 REE中间件系统 - 使用新的#[middleware]宏
+// 🎉 REE中间件系统 - 使用更简洁的中间件写法
 // =============================================================================
 //
-// 这个示例展示了如何使用新的#[middleware]属性宏来简化中间件的编写。
-// 该宏可以将带参数的async函数自动转换为中间件闭包。
+// 这个示例展示了如何使用更简洁的中间件函数来简化中间件的编写。
+// 这种方式不需要使用宏，直接使用普通的异步函数即可。
 //
-// ## 宏的使用方式：
-//
-// ### 统一使用 #[middleware] 宏（推荐）
-// 为了代码的一致性和可维护性，推荐统一使用宏：
+// ## 中间件的使用方式：
 //
 // ```rust
-// // 带参数的中间件
-// #[middleware]
-// async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
+// // 直接使用闭包
+// app.use_middleware(|ctx, next| async move {
+//     // 中间件逻辑...
+//     next(ctx).await
+// });
+//
+// // 使用带参数的中间件函数
+// app.use_middleware(|ctx, next| logging("Prefix", ctx, next));
+//
+// // 定义中间件函数
+// async fn logging(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
 //     // 中间件逻辑...
 //     next(ctx).await
 // }
-//
-// // 无参数的中间件
-// #[middleware]
-// async fn cors(ctx: RequestCtx, next: Next) -> Response {
-//     // CORS逻辑...
-//     next(ctx).await
-// }
-//
-// // 使用：
-// app.use_middleware(auth("Bearer secret-token")); // 有参数
-// app.use_middleware(cors);                        // 无参数
 // ```
 //
-// ### 混合使用方式（也可以，但不推荐）
-// ```rust
-// #[middleware]
-// async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response { ... }
-//
-// async fn cors(ctx: RequestCtx, next: Next) -> Response { ... } // 不用宏
-// ```
-//
-// ## 为什么推荐统一使用宏？
-// - ✅ 代码风格一致
-// - ✅ 学习成本更低（只需要记住一种写法）
-// - ✅ 未来扩展兼容（如果宏增加新功能，所有中间件都能受益）
-// - ✅ 更好的错误提示和类型检查
-//
-// ## 宏的转换原理：
-//
-// 带参数的函数会被转换为返回闭包的函数：
-// ```rust
-// fn auth(token: &'static str) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
-//     move |ctx, next| {
-//         Box::pin(async move {
-//             // 原始的函数体
-//         })
-//     }
-// }
-// ```
-//
-// 这样就可以在保持简洁语法的同时，支持参数化的中间件！
+// ## 为什么这种方式更好？
+// - ✅ 代码更简洁，没有宏的复杂性
+// - ✅ 更直观，容易理解
+// - ✅ 更灵活，可以轻松组合中间件
+// - ✅ 标准Rust语法，无需特殊处理
 //
 // =============================================================================
 
 // =============================================================================
-// 示例中间件实现 - 演示如何使用新的#[middleware]宏
+// 示例中间件实现
 // =============================================================================
 
-/// 🚀 访问日志中间件 - 推荐统一使用宏
-#[middleware]
-async fn access_log(ctx: RequestCtx, next: Next) -> Response {
+/// 🚀 访问日志中间件
+async fn access_log(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let start = Instant::now();
     let method = ctx.request.method().to_string();
     let path = ctx.request.uri().path().to_string();
 
+    println!("[{}] 开始处理请求: {} {}", prefix, method, path);
+    
     let response = next(ctx).await;
-
+    
     println!(
-        "{} {} {} {}ms",
+        "[{}] 完成请求: {} {} {} {}ms",
+        prefix,
         method,
         path,
         response.status().as_str(),
@@ -89,17 +62,15 @@ async fn access_log(ctx: RequestCtx, next: Next) -> Response {
     response
 }
 
-/// 🚀 计时器中间件 - 推荐统一使用宏
-#[middleware]
-async fn timer(ctx: RequestCtx, next: Next) -> Response {
+/// 🚀 计时器中间件
+async fn timer(name: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let start = Instant::now();
     let response = next(ctx).await;
-    println!("Request processing time: {}ms", start.elapsed().as_millis());
+    println!("[{}] 请求处理时间: {}ms", name, start.elapsed().as_millis());
     response
 }
 
-/// 🚀 认证中间件 - 使用新的 #[middleware] 宏
-#[middleware]
+/// 🚀 认证中间件
 async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
     if let Some(auth) = ctx.request.headers().get("Authorization") {
         if auth.to_str().unwrap_or("") == token {
@@ -109,8 +80,49 @@ async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
     ResponseBuilder::unauthorized_json(r#"{"error": "Unauthorized"}"#)
 }
 
-/// 🚀 JWT 认证中间件 - 使用新的 #[middleware] 宏（简化版本，用于演示）
-#[middleware]
+/// 🔐 简单认证中间件
+async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> Response {
+    // 从请求头中获取认证令牌
+    let auth_header = match ctx.request.headers().get("Authorization") {
+        Some(header) => header,
+        None => {
+            return ResponseBuilder::new()
+                .status(hyper::StatusCode::UNAUTHORIZED)
+                .header("Content-Type", "application/json")
+                .json(json!({
+                    "error": "未提供认证信息",
+                    "message": "请在Authorization头中提供有效的令牌"
+                }));
+        }
+    };
+
+    // 验证令牌
+    let auth_str = match auth_header.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            return ResponseBuilder::new()
+                .status(hyper::StatusCode::BAD_REQUEST)
+                .header("Content-Type", "application/json")
+                .json(json!({"error": "无效的认证头"}));
+        }
+    };
+
+    // 检查令牌是否有效
+    if auth_str != format!("Bearer {}", token_value) {
+        return ResponseBuilder::new()
+            .status(hyper::StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json")
+            .json(json!({
+                "error": "无效的令牌",
+                "message": "提供的认证令牌无效或已过期"
+            }));
+    }
+
+    // 认证通过，继续处理请求
+    next(ctx).await
+}
+
+/// 🚀 JWT 认证中间件 - 使用简洁的函数式风格
 async fn jwt_auth(secret: &'static str, ctx: RequestCtx, next: Next) -> Response {
     // 从 Authorization header 获取 JWT token
     if let Some(auth_header) = ctx.request.headers().get("Authorization") {
@@ -168,8 +180,7 @@ fn extract_user_from_token(token: &str) -> String {
     }
 }
 
-/// 🚀 JWT 权限检查中间件 - 使用新的 #[middleware] 宏
-#[middleware]
+/// 🚀 JWT 权限检查中间件 - 使用简洁的函数式风格
 async fn jwt_require_role(required_role: &'static str, ctx: RequestCtx, next: Next) -> Response {
     // 这个中间件应该在 jwt_auth 之后使用
     // 从 Authorization header 获取并解析角色
@@ -203,13 +214,11 @@ fn generate_demo_jwt_token(user: &str, role: &str) -> String {
     format!("{}.{}.{}", user, role, timestamp)
 }
 
-/// 🚀 请求计数器中间件 - 推荐统一使用宏
-#[middleware]
+/// 🚀 请求计数器中间件
 async fn request_counter(ctx: RequestCtx, next: Next) -> Response {
-    let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let counter = counter.clone();
-    let current = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    println!("Total requests: {}", current + 1);
+    static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let current = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    println!("总请求次数: {}", current + 1);
     next(ctx).await
 }
 
@@ -283,8 +292,7 @@ fn cors() -> CorsBuilder {
     CorsBuilder::new()
 }
 
-/// 🚀 限流中间件 - 使用新的 #[middleware] 宏（简化版本）
-#[middleware]
+/// 🚀 限流中间件 - 使用简洁的函数式风格
 async fn rate_limit(max_requests: usize, ctx: RequestCtx, next: Next) -> Response {
     use std::sync::atomic::{AtomicUsize, Ordering};
     
@@ -324,8 +332,7 @@ async fn cors_simple(ctx: RequestCtx, next: Next) -> Response {
     response
 }
 
-/// 🚀 自定义CORS中间件 - 使用新的 #[middleware] 宏
-#[middleware]
+/// 🚀 自定义CORS中间件 - 使用简洁的函数式风格
 async fn cors_custom(origin: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let mut response = next(ctx).await;
     let headers = response.headers_mut();
@@ -345,8 +352,7 @@ async fn request_id(ctx: RequestCtx, next: Next) -> Response {
     response
 }
 
-/// 🚀 API密钥验证中间件 - 使用新的 #[middleware] 宏
-#[middleware]
+/// 🚀 API密钥验证中间件 - 使用简洁的函数式风格
 async fn api_key_auth(valid_key: &'static str, ctx: RequestCtx, next: Next) -> Response {
     if let Some(api_key) = ctx.request.headers().get("X-API-Key") {
         if api_key.to_str().unwrap_or("") == valid_key {
@@ -425,147 +431,137 @@ fn create_rate_limit(max_requests: usize) -> RateLimitBuilder {
     RateLimitBuilder::new(max_requests)
 }
 
-// =============================================================================
-// 📚 推荐的统一宏使用方式
-// =============================================================================
-
-// 🎯 推荐：统一使用 #[middleware] 宏（无论是否有参数）
-//
-// ✅ 带参数的中间件（必须使用宏）:
-// - #[middleware] async fn auth(token, ctx, next)
-// - #[middleware] async fn jwt_auth(secret, ctx, next) 
-// - #[middleware] async fn jwt_require_role(role, ctx, next)
-// - #[middleware] async fn cors_custom(origin, ctx, next)
-// - #[middleware] async fn api_key_auth(key, ctx, next)
-// - #[middleware] async fn rate_limit(max_requests, ctx, next)
-//
-// ✅ 无参数的中间件（推荐也使用宏，保持一致性）:
-// - #[middleware] async fn access_log(ctx, next)
-// - #[middleware] async fn timer(ctx, next)
-// - #[middleware] async fn request_counter(ctx, next)
-// - #[middleware] async fn cors_simple(ctx, next)
-// - #[middleware] async fn request_id(ctx, next)
-// - #[middleware] async fn require_json(ctx, next)
-// - #[middleware] async fn error_handler(ctx, next)
-//
-// 🎯 当前示例为了展示灵活性，混合使用了两种方式，
-//    但在实际项目中推荐统一使用 #[middleware] 宏！
-
-// =============================================================================
-// 🎉 最终方案对比 - 新方案获胜！
-// =============================================================================
-/*
-🏆 最终推荐方案 - 新的AsyncMiddleware trait方案:
-
-✅ 使用超级简单:
-   app.use_middleware(rate_limit_v2(100))
-   app.use_middleware(auth_v2("Bearer token"))
-   app.use_middleware(jwt_auth_v2("secret"))
-
-✅ 支持链式调用:
-   app.use_middleware(rate_limit_v2(100).window_seconds(30))
-
-✅ 类型安全:
-   编译时检查，无运行时错误
-
-✅ 性能优异:
-   零开销抽象，与原生async函数性能相同
-
-✅ 扩展性强:
-   通过实现AsyncMiddleware trait轻松添加新中间件
-
-对比其他方案:
-❌ 原闭包方案: 类型签名复杂，不够直观
-❌ 简单async函数: 无法传参，不够灵活  
-❌ 构建器模式: 需要额外的build_async()调用
-
-🎯 结论: 新方案完美结合了简洁性和灵活性！
-*/
-
 /// 🚀 错误处理中间件
 async fn error_handler(ctx: RequestCtx, next: Next) -> Response {
-    // 在调用 next 之前提取需要的信息
-    let method = ctx.request.method().to_string();
-    let path = ctx.request.uri().path().to_string();
-
+    // 尝试执行下一个处理器，并捕获可能的错误
     let response = next(ctx).await;
-
-    // 如果是错误状态码，添加一些调试信息
-    if response.status().is_client_error() || response.status().is_server_error() {
-        println!(
-            "⚠️ Error response: {} for {} {}",
-            response.status(),
-            method,
-            path
-        );
+    
+    // 检查状态码是否为错误
+    if response.status().is_server_error() {
+        println!("服务器错误: {}", response.status());
+        
+        // 这里可以记录错误，发送告警等
+        
+        // 在生产环境中，你可能想要用更友好的错误消息替换原始错误
+        // 这里只是简单地返回原始响应
+    } else if response.status().is_client_error() {
+        println!("客户端错误: {}", response.status());
+        
+        // 可以记录客户端错误以分析API使用问题
     }
-
+    
     response
 }
 
-/// 🚀 最优雅的解决方案 - 支持async的参数化中间件
-/// 
-/// 这个方案的核心思想是：
-/// 1. 定义一个trait来统一中间件接口
-/// 2. 为不同的函数类型实现这个trait
-/// 3. 提供一个便捷的宏或函数来简化使用
-
-/// 中间件trait - 统一所有中间件的接口
-trait AsyncMiddleware: Send + Sync + 'static {
-    fn call(&self, ctx: RequestCtx, next: Next) -> Pin<Box<dyn Future<Output = Response> + Send>>;
-}
-
-/// 为普通async函数实现中间件trait
-impl<F> AsyncMiddleware for F
-where
-    F: Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static,
-{
-    fn call(&self, ctx: RequestCtx, next: Next) -> Pin<Box<dyn Future<Output = Response> + Send>> {
-        self(ctx, next)
+/// 🌐 CORS中间件
+async fn cors(ctx: RequestCtx, next: Next) -> Response {
+    let response = next(ctx).await;
+    
+    // 添加CORS头
+    let builder = hyper::Response::builder()
+        .status(response.status())
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        .header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    
+    // 如果是OPTIONS请求，直接返回
+    if ctx.request.method() == hyper::Method::OPTIONS {
+        return builder
+            .header("Access-Control-Max-Age", "86400")
+            .body(response.into_body())
+            .unwrap();
     }
-}
-
-/// 🚀 参数化限流中间件 - 简单而灵活的版本
-pub struct RateLimit {
-    max_requests: usize,
-    window_seconds: u64,
-    requests_count: Arc<std::sync::atomic::AtomicUsize>,
-    last_reset: Arc<std::sync::Mutex<Instant>>,
-}
-
-impl RateLimit {
-    pub fn new(max_requests: usize) -> Self {
-        Self {
-            max_requests,
-            window_seconds: 60,
-            requests_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-            last_reset: Arc::new(std::sync::Mutex::new(Instant::now())),
+    
+    // 复制所有原始的响应头
+    let mut new_response = builder.body(response.into_body()).unwrap();
+    for (key, value) in response.headers() {
+        if key != "access-control-allow-origin" && 
+           key != "access-control-allow-methods" && 
+           key != "access-control-allow-headers" {
+            new_response.headers_mut().insert(key.clone(), value.clone());
         }
     }
     
-    pub fn window_seconds(mut self, seconds: u64) -> Self {
-        self.window_seconds = seconds;
-        self
-    }
+    new_response
 }
 
-impl AsyncMiddleware for RateLimit {
-    fn call(&self, ctx: RequestCtx, next: Next) -> Pin<Box<dyn Future<Output = Response> + Send>> {
-        let requests_count = self.requests_count.clone();
-        let last_reset = self.last_reset.clone();
-        let max_requests = self.max_requests;
-        let window_seconds = self.window_seconds;
+// =============================================================================
+// 📚 函数式中间件使用指南
+// =============================================================================
+
+// 🎯 函数式中间件的几种使用方式:
+//
+// ✅ 直接使用简单的闭包:
+// ```rust
+// app.use_middleware(|ctx, next| async move {
+//     println!("处理请求前");
+//     let response = next(ctx).await;
+//     println!("处理请求后");
+//     response
+// });
+// ```
+//
+// ✅ 使用带参数的辅助函数:
+// ```rust
+// // 定义带参数的中间件函数
+// async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
+//     // 验证逻辑...
+//     next(ctx).await
+// }
+//
+// // 使用方式
+// app.use_middleware(|ctx, next| auth("Bearer token", ctx, next));
+// ```
+//
+// ✅ 使用无参数的辅助函数:
+// ```rust
+// // 定义无参数的中间件函数
+// async fn cors(ctx: RequestCtx, next: Next) -> Response {
+//     // CORS逻辑...
+//     next(ctx).await
+// }
+//
+// // 使用方式
+// app.use_middleware(cors);
+// ```
+//
+// 🎯 优势:
+// - 简洁直观的语法
+// - 标准Rust语法，无需宏
+// - 类型安全，编译时检查
+// - 易于测试单独的中间件函数
+// - 极高的灵活性和组合性
+// - 零运行时开销
+//
+// 🎯 最佳实践:
+// - 对有共性的中间件逻辑提取为函数
+// - 有参数的中间件使用|ctx, next|闭包包装
+// - 无参数的中间件可以直接传递函数名
+// - 参数用&'static str保证静态生命周期
+// - 复杂的中间件考虑使用构建器模式
+
+/// 增强版可配置限流中间件
+/// 这个函数允许自定义窗口时间周期
+pub fn advanced_rate_limit(max_requests: usize, window_seconds: u64) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
+    // 使用静态计数器和上次重置时间
+    let requests_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let last_reset = Arc::new(std::sync::Mutex::new(Instant::now()));
+
+    move |ctx, next| {
+        let requests_count = requests_count.clone();
+        let last_reset = last_reset.clone();
         
         Box::pin(async move {
-            // 重置逻辑
+            // 检查是否需要重置计数器
             {
-                let mut last_reset = last_reset.lock().unwrap();
-                if last_reset.elapsed().as_secs() > window_seconds {
+                let mut last_reset_guard = last_reset.lock().unwrap();
+                if last_reset_guard.elapsed().as_secs() > window_seconds {
                     requests_count.store(0, std::sync::atomic::Ordering::SeqCst);
-                    *last_reset = Instant::now();
+                    *last_reset_guard = Instant::now();
                 }
             }
 
+            // 增加计数并检查限制
             let current = requests_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if current >= max_requests {
                 return ResponseBuilder::too_many_requests_json(
@@ -576,78 +572,6 @@ impl AsyncMiddleware for RateLimit {
             next(ctx).await
         })
     }
-}
-
-/// 🚀 参数化认证中间件
-pub struct Auth {
-    token: String,
-}
-
-impl Auth {
-    pub fn new(token: impl Into<String>) -> Self {
-        Self {
-            token: token.into(),
-        }
-    }
-}
-
-impl AsyncMiddleware for Auth {
-    fn call(&self, ctx: RequestCtx, next: Next) -> Pin<Box<dyn Future<Output = Response> + Send>> {
-        let expected_token = self.token.clone();
-        Box::pin(async move {
-            if let Some(auth) = ctx.request.headers().get("Authorization") {
-                if auth.to_str().unwrap_or("") == expected_token {
-                    return next(ctx).await;
-                }
-            }
-            ResponseBuilder::unauthorized_json(r#"{"error": "Unauthorized"}"#)
-        })
-    }
-}
-
-/// 🚀 参数化JWT认证中间件
-pub struct JwtAuth {
-    secret: String,
-}
-
-impl JwtAuth {
-    pub fn new(secret: impl Into<String>) -> Self {
-        Self {
-            secret: secret.into(),
-        }
-    }
-}
-
-impl AsyncMiddleware for JwtAuth {
-    fn call(&self, ctx: RequestCtx, next: Next) -> Pin<Box<dyn Future<Output = Response> + Send>> {
-        let secret = self.secret.clone();
-        Box::pin(async move {
-            if let Some(auth_header) = ctx.request.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                        if validate_jwt_token(token, &secret) {
-                            println!("✅ JWT authentication successful: {}", extract_user_from_token(token));
-                            return next(ctx).await;
-                        }
-                    }
-                }
-            }
-            ResponseBuilder::unauthorized_json(r#"{"error": "Invalid or missing JWT token"}"#)
-        })
-    }
-}
-
-/// 🚀 便捷函数 - 让使用更加简单
-pub fn rate_limit_v2(max_requests: usize) -> RateLimit {
-    RateLimit::new(max_requests)
-}
-
-pub fn auth_v2(token: impl Into<String>) -> Auth {
-    Auth::new(token)
-}
-
-pub fn jwt_auth_v2(secret: impl Into<String>) -> JwtAuth {
-    JwtAuth::new(secret)
 }
 
 // =============================================================================
@@ -661,32 +585,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🛠 Ree HTTP Framework - Function-based Middleware System");
     println!("════════════════════════════════════════════════════════");
     println!("✨ Modern function-based middleware API, zero-cost and composable!");
-    println!("🎯 推荐统一使用 #[middleware] 宏，保持代码风格一致性！");
+    println!("🎯 使用简洁的函数式中间件，更直观、更灵活！");
 
-    // 1. 全局中间件 - 展示统一使用宏的好处
-    println!("1️⃣ Global middleware - Unified macro usage (recommended)");
-    app.use_middleware(access_log);     // 🔥 无参数，但使用宏保持一致性
-    app.use_middleware(timer);          // 🔥 无参数，但使用宏保持一致性
-    app.use_middleware(request_counter); // 🔥 无参数，但使用宏保持一致性
+    // 1. 全局中间件 - 使用简洁的函数式写法
+    println!("1️⃣ Global middleware - Simple function-based middleware");
+    app.use_middleware(|ctx, next| logging("访问日志", ctx, next));
+    app.use_middleware(|ctx, next| timer("请求计时器", ctx, next));
 
-    // 2. CORS中间件 - 展示混合使用方式
-    println!("2️⃣ CORS middleware - Mixed usage (for demonstration)");
-    app.use_middleware(cors_simple); // 💫 不使用宏的版本（为了展示灵活性）
-    // app.use_middleware(cors_custom("https://example.com")); // 🔥 使用宏的版本
+    // 2. CORS中间件和请求计数器
+    println!("2️⃣ CORS middleware and request counter");
+    app.use_middleware(cors_simple); // 无参数的中间件
+    app.use_middleware(request_counter); // 无参数的中间件
 
     // 3. 其他全局中间件 - 混合方式
     println!("3️⃣ Other global middleware - Mixed for demonstration");
     app.use_middleware(request_id); // 💫 不使用宏的版本
 
-    // 4. 路由组中间件 - 展示带参数中间件的使用（需要宏）
-    println!("4️⃣ Route group middleware - With parameters (requires macro)");
+    // 4. 路由组中间件 - 展示带参数函数式中间件的使用
+    println!("4️⃣ Route group middleware - With parameters using function-based approach");
     {
         let api_group = app.group("/api");
 
-        // ✅ 带参数的中间件：必须使用 #[middleware] 宏
-        api_group.use_middleware(auth("Bearer secret-token"));        // 🔥 宏版本
-        api_group.use_middleware(rate_limit(50));                     // 🔥 宏版本 
-        api_group.use_middleware(api_key_auth("my-secret-api-key"));  // 🔥 宏版本
+        // 使用函数式中间件写法，更加简洁直观
+        api_group.use_middleware(|ctx, next| auth_simple("Bearer secret-token", ctx, next));
+        api_group.use_middleware(|ctx, next| rate_limit(50, ctx, next));
+        api_group.use_middleware(|ctx, next| api_key_auth("my-secret-api-key", ctx, next));
         api_group.use_middleware(|ctx, next| {
             Box::pin(async move {
                 println!("🚦 API Group: Validating request format");
@@ -732,12 +655,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 5. JWT 认证路由组 - 展示带参数中间件的使用
-    println!("5️⃣ JWT authentication route group - Parameterized middleware");
+    println!("5️⃣ JWT authentication route group - Function-based middleware");
     {
         let jwt_group = app.group("/jwt");
 
-        // ✅ 带参数的中间件：需要使用 #[middleware] 宏
-        jwt_group.use_middleware(jwt_auth("my-secret-key")); // 🔥 宏版本
+        // 使用函数式中间件写法，更加简洁直观
+        jwt_group.use_middleware(|ctx, next| jwt_auth("my-secret-key", ctx, next));
         
         // JWT路由
         jwt_group.get("/profile", |_ctx: RequestCtx| async move {
@@ -745,7 +668,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "message": "用户个人资料",
                 "user": "从JWT token中解析的用户信息",
                 "auth_method": "JWT",
-                "note": "使用新的#[middleware]宏实现"
+                "note": "使用简洁的函数式中间件实现"
             })
         });
 
@@ -754,19 +677,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "message": "用户仪表板",
                 "data": ["图表1", "图表2", "图表3"],
                 "auth_method": "JWT",
-                "note": "使用新的#[middleware]宏实现"
+                "note": "使用简洁的函数式中间件实现"
             })
         });
     }
 
-    // 6. JWT + 角色权限路由组演示 - 使用新的宏版本
-    println!("6️⃣ JWT + Role-based permissions route group - New macro version");
+    // 6. JWT + 角色权限路由组演示 - 使用新的函数式中间件
+    println!("6️⃣ JWT + Role-based permissions route group - Function-based middleware");
     {
         let admin_group = app.group("/admin");
 
-        // JWT认证 + 管理员角色要求 - 使用新的宏版本
-        admin_group.use_middleware(jwt_auth("my-secret-key"));
-        admin_group.use_middleware(jwt_require_role("admin"));
+        // JWT认证 + 管理员角色要求 - 使用函数式中间件
+        admin_group.use_middleware(|ctx, next| jwt_auth("my-secret-key", ctx, next));
+        admin_group.use_middleware(|ctx, next| jwt_require_role("admin", ctx, next));
 
         admin_group.get("/users", |_ctx: RequestCtx| async move {
             json!({
@@ -788,116 +711,176 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // 8. JWT Token生成端点（用于测试）
-    app.post("/auth/login", |_ctx: RequestCtx| async move {
-        // 在实际项目中，这里应该验证用户名密码
-        let admin_token = generate_demo_jwt_token("alice", "admin");
-        let user_token = generate_demo_jwt_token("bob", "user");
-
+    // 7. 高级限流中间件演示
+    println!("7️⃣ Advanced rate limiter with configurable window");
+    {
+        let limiter_group = app.group("/limiter");
+        
+        // 使用高级限流中间件 - 配置10秒窗口，最多5个请求
+        limiter_group.use_middleware(advanced_rate_limit(5, 10));
+        
+        // 限流测试路由
+        limiter_group.get("/test", |_ctx: RequestCtx| async move {
+            // 模拟处理时间
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            
+            json!({
+                "message": "限流测试成功",
+                "limit": "5个请求/10秒",
+                "info": "快速多次访问此接口会触发限流"
+            })
+        });
+    }
+    
+    // 添加最终的日志中间件演示
+    app.get("/demo/logging", |_ctx: RequestCtx| async move {
         json!({
-            "message": "登录成功（演示）",
-            "tokens": {
-                "admin": admin_token,
-                "user": user_token
-            },
-            "usage": {
-                "header": "Authorization: Bearer <token>",
-                "endpoints": {
-                    "jwt_protected": "/jwt/profile, /jwt/dashboard",
-                    "admin_only": "/admin/users"
-                }
-            }
+            "message": "这是一个演示各种日志中间件的端点",
+            "timestamp": "2025-06-16T12:00:00Z"
         })
     });
-
-    // 9. 基础路由（不需要认证）
-    println!("9️⃣ Basic routes (with global middleware)");
-
-    app.get("/", |_: RequestCtx| async {
-        json!({
-            "message": "🎉 欢迎使用 Ree HTTP Framework!",
-            "version": "0.1.0",
-            "features": [
-                "函数式中间件",
-                "零开销抽象",
-                "易于组合",
-                "类型安全",
-                "链式执行"
-            ],
-            "middleware_examples": [
-                "访问日志",
-                "计时器",
-                "请求计数",
-                "CORS",
-                "简单认证",
-                "JWT认证",
-                "角色权限",
-                "限流",
-                "错误处理"
-            ]
-        })
-    });
-
-    app.get("/health", |_: RequestCtx| async {
-        json!({"status": "ok", "timestamp": "2025-06-16T12:00:00Z"})
-    });
-
-    app.get("/middleware-test", |_: RequestCtx| async {
-        json!({
-            "message": "这个响应经过了所有全局中间件处理",
-            "middlewares_applied": [
-                "access_log",
-                "timer",
-                "request_counter",
-                "cors",
-                "error_handler",
-                "rate_limit(100)",
-                "custom_logger"
-            ]
-        })
-    });
-
-    // 7. 错误处理演示
-    app.get("/error", |_: RequestCtx| async {
-        json!({"error": "内部服务器错误", "code": 500})
-    });
-
-    app.get("/not-found", |_: RequestCtx| async {
-        json!({"error": "资源未找到", "code": 404})
-    });
-
+    
+    // 使用自定义日志中间件
+    app.use_middleware(|ctx, next| logging("全局日志中间件", ctx, next));
+    
     println!("\n🚀 Server starting...");
     println!("📍 Address: http://127.0.0.1:3000");
-    println!("\n📋 Test routes:");
-    println!("  GET  /                  - Home page");
-    println!("  GET  /health            - Health check");
-    println!("  GET  /middleware-test   - Middleware test");
-    println!("  GET  /error             - Error handling demo");
-    println!("  GET  /not-found         - 404 error demo");
-    println!("  GET  /api/users         - Requires authentication (Bearer secret-token)");
-    println!("  POST /api/users         - Requires authentication (Bearer secret-token)");
-    println!("  GET  /api/stats         - API statistics");
-    println!("  POST /auth/login        - Get JWT token (demo)");
-    println!("  GET  /jwt/profile       - JWT authenticated user info");
-    println!("  GET  /jwt/dashboard     - JWT authenticated dashboard");
-    println!("  GET  /admin/users       - Admin user list (requires admin role)");
-    println!("  POST /admin/users       - Admin create user (requires admin role)");
-    println!("\n💡 Test simple authentication API:");
+    println!("\n📋 测试路由:");
+    println!("  GET  /                    - 主页");
+    println!("  GET  /api/users           - 需要认证 (Bearer secret-token)");
+    println!("  GET  /api/stats           - API统计信息");
+    println!("  GET  /jwt/profile         - JWT认证用户信息");
+    println!("  GET  /admin/users         - 需要admin角色权限");
+    println!("  GET  /limiter/test        - 限流测试 (5次/10秒)");
+    println!("  GET  /demo/logging        - 日志中间件演示");
+    
+    println!("\n💡 测试日志中间件:");
+    println!("  curl http://127.0.0.1:3000/demo/logging");
+    println!("\n💡 测试认证API:");
     println!("  curl -H 'Authorization: Bearer secret-token' http://127.0.0.1:3000/api/users");
-    println!("\n🔐 Test JWT authentication:");
-    println!("  1. Get token: curl -X POST http://127.0.0.1:3000/auth/login");
-    println!(
-        "  2. 使用token: curl -H 'Authorization: Bearer <admin_token>' http://127.0.0.1:3000/jwt/profile"
-    );
-    println!(
-        "  3. 管理员API: curl -H 'Authorization: Bearer <admin_token>' http://127.0.0.1:3000/admin/users"
-    );
-    println!(
-        "  4. 普通用户API: curl -H 'Authorization: Bearer <user_token>' http://127.0.0.1:3000/jwt/dashboard"
-    );
-    println!("\n🔍 测试限流:");
-    println!("  快速发送多个请求观察限流效果");
+    println!("\n💡 测试限流:");
+    println!("  快速多次执行: curl http://127.0.0.1:3000/limiter/test");
+    
+    println!("\n🔥 新的函数式中间件让开发更简洁高效！");
 
     app.run("127.0.0.1:3000").await?;
     Ok(())
+}
+
+// =============================================================================
+// 路由处理器
+// =============================================================================
+
+/// 首页处理器
+async fn index(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .json(json!({
+            "message": "欢迎使用REE框架",
+            "version": "1.0.0",
+            "description": "一个简单、高效的Rust Web框架"
+        }))
+}
+
+/// 用户信息处理器
+async fn user_info(ctx: RequestCtx) -> Response {
+    // 获取URL参数
+    if let Some(user_id) = ctx.get_param("id") {
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .json(json!({
+                "id": user_id,
+                "name": "测试用户",
+                "email": "test@example.com",
+                "created_at": "2025-01-01T00:00:00Z"
+            }))
+    } else {
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::BAD_REQUEST)
+            .header("Content-Type", "application/json")
+            .json(json!({
+                "error": "缺少用户ID"
+            }))
+    }
+}
+
+/// 模拟API处理器
+async fn api_handler(_ctx: RequestCtx) -> Response {
+    // 故意延迟一点来测试计时器中间件
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .json(json!({
+            "data": {
+                "items": [
+                    { "id": 1, "name": "项目1" },
+                    { "id": 2, "name": "项目2" },
+                    { "id": 3, "name": "项目3" }
+                ],
+                "total": 3
+            }
+        }))
+}
+
+/// 受保护的API处理器
+async fn protected_api(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .json(json!({
+            "message": "认证成功，你已访问受保护的资源",
+            "data": {
+                "sensitive": true,
+                "value": "这是一个需要认证才能访问的秘密数据",
+                "timestamp": "2025-06-16T10:00:00Z"
+            }
+        }))
+}
+
+/// 模拟错误处理器
+async fn error_demo(_ctx: RequestCtx) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+        .header("Content-Type", "application/json")
+        .json(json!({
+            "error": "这是一个模拟的服务器错误",
+            "code": "SERVER_ERROR_DEMO"
+        }))
+}
+
+/// 日志中间件的辅助函数 - 使用函数式风格
+async fn logging(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
+    let start = Instant::now();
+    let path = ctx.request.uri().path();
+    let method = ctx.request.method();
+    
+    println!("[{}] 📝 处理请求: {} {}", prefix, method, path);
+    
+    let response = next(ctx).await;
+    
+    let status = response.status();
+    let status_str = if status.is_success() {
+        format!("✅ {}", status)
+    } else if status.is_client_error() {
+        format!("⚠️ {}", status)
+    } else if status.is_server_error() {
+        format!("❌ {}", status)
+    } else {
+        format!("ℹ️ {}", status)
+    };
+    
+    println!(
+        "[{}] 🏁 请求完成: {} {} {} ({}ms)", 
+        prefix, 
+        method, 
+        path, 
+        status_str, 
+        start.elapsed().as_millis()
+    );
+    
+    response
 }

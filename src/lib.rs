@@ -32,9 +32,6 @@ pub use response::{IntoResponse, Response, ResponseBuilder};
 /// Middleware system
 pub use middleware::Next;
 
-/// Macro support
-pub use ree_macros::middleware;
-
 // =============================================================================
 // Advanced/Internal API Exports
 // =============================================================================

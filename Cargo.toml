@@ -13,4 +13,3 @@ hyper-util = { version = "0.1.14", features = ["full"] }
 async-trait = "0.1.88"
 serde_json = "1.0.140"
 serde = { version = "1.0.219", features = ["derive"] }
-ree-macros = { path = "./ree-macros" }

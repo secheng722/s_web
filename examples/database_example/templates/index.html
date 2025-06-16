@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ree Framework - Database Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .method {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-size: 12px;
+        }
+        .method.get { background: #28a745; }
+        .method.post { background: #007bff; }
+        .method.put { background: #ffc107; color: #333; }
+        .method.delete { background: #dc3545; }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+        }
+        .example {
+            margin-top: 10px;
+        }
+        .button {
+            background: #007acc;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #005c99;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Ree Framework</h1>
+        <h2>📊 Database Example - User Management API</h2>
+        <p>使用 SQLite 数据库的完整 CRUD API 示例</p>
+    </div>
+
+    <h3>📋 API 端点</h3>
+
+    <div class="endpoint">
+        <span class="method get">GET</span> <strong>/api/v1/users</strong>
+        <p>获取所有用户列表</p>
+        <div class="example">
+            <div class="code">curl http://127.0.0.1:3000/api/v1/users</div>
+        </div>
+    </div>
+
+    <div class="endpoint">
+        <span class="method post">POST</span> <strong>/api/v1/users</strong>
+        <p>创建新用户</p>
+        <div class="example">
+            <div class="code">curl -X POST http://127.0.0.1:3000/api/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"张三","email":"zhangsan@example.com"}'</div>
+        </div>
+    </div>
+
+    <div class="endpoint">
+        <span class="method get">GET</span> <strong>/api/v1/users/:id</strong>
+        <p>获取特定用户信息</p>
+        <div class="example">
+            <div class="code">curl http://127.0.0.1:3000/api/v1/users/{user_id}</div>
+        </div>
+    </div>
+
+    <div class="endpoint">
+        <span class="method put">PUT</span> <strong>/api/v1/users/:id</strong>
+        <p>更新用户信息</p>
+        <div class="example">
+            <div class="code">curl -X PUT http://127.0.0.1:3000/api/v1/users/{user_id} \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"李四","email":"lisi@example.com"}'</div>
+        </div>
+    </div>
+
+    <div class="endpoint">
+        <span class="method delete">DELETE</span> <strong>/api/v1/users/:id</strong>
+        <p>删除用户</p>
+        <div class="example">
+            <div class="code">curl -X DELETE http://127.0.0.1:3000/api/v1/users/{user_id}</div>
+        </div>
+    </div>
+
+    <div class="endpoint">
+        <span class="method get">GET</span> <strong>/health</strong>
+        <p>健康检查</p>
+        <div class="example">
+            <div class="code">curl http://127.0.0.1:3000/health</div>
+        </div>
+    </div>
+
+    <h3>📊 数据模型</h3>
+    <div class="code">{
+  "id": "uuid",
+  "name": "string",
+  "email": "string",
+  "created_at": "ISO 8601 timestamp"
+}</div>
+
+    <h3>🚀 快速开始</h3>
+    <ol>
+        <li>确保已安装 Rust 和 Cargo</li>
+        <li>运行示例：<code>cargo run</code></li>
+        <li>访问 API 或使用上面的 curl 命令测试</li>
+    </ol>
+
+    <h3>✨ 特性</h3>
+    <ul>
+        <li>🗄️ SQLite 数据库集成</li>
+        <li>🔄 完整的 CRUD 操作</li>
+        <li>🛡️ 错误处理</li>
+        <li>📝 数据验证</li>
+        <li>🌐 CORS 支持</li>
+        <li>📊 JSON API 响应</li>
+        <li>🎯 路由分组</li>
+        <li>💾 状态管理</li>
+    </ul>
+
+    <script>
+        // 简单的交互性
+        document.querySelectorAll('.code').forEach(code => {
+            code.addEventListener('click', function() {
+                navigator.clipboard.writeText(this.textContent);
+                const original = this.style.background;
+                this.style.background = '#4a5568';
+                setTimeout(() => this.style.background = original, 200);
+            });
+        });
+    </script>
+</body>
+</html>

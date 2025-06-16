@@ -62,7 +62,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         response
     });
 
-    app.use_middleware(|ctx: RequestCtx, next: ree::Next| logging("prefix", ctx, next));
 
     // 创建API路由组
     let api = app.group("/api/v1");
@@ -348,47 +347,4 @@ async fn delete_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Val
         "success": true,
         "message": "用户删除成功"
     }))
-}
-
-// 中间件函数实现 - 直接调用模式
-
-async fn logging(prefix: &str, ctx: RequestCtx, next: ree::Next) -> ree::Response {
-    let start = std::time::Instant::now();
-    let method = ctx.method().to_string();
-    let path = ctx.path().to_string();
-
-    println!("[{}] {} {} - 开始处理", prefix, method, path);
-
-    let response = next(ctx).await;
-    let duration = start.elapsed();
-
-    println!("[{}] {} {} - 完成 ({:?})", prefix, method, path, duration);
-    response
-}
-
-async fn auth_check(required_role: &str, ctx: RequestCtx, next: ree::Next) -> ree::Response {
-    let auth_header = ctx.get_header("Authorization");
-
-    if auth_header.is_none() {
-        println!("🚫 认证失败: 需要 {} 角色", required_role);
-        return ResponseBuilder::new()
-            .status(StatusCode::UNAUTHORIZED)
-            .json(json!({
-                "error": "需要认证",
-                "required_role": required_role
-            }));
-    }
-
-    println!("✅ {} 角色认证通过", required_role);
-    next(ctx).await
-}
-
-async fn rate_limit(max_requests: u32, ctx: RequestCtx, next: ree::Next) -> ree::Response {
-    // 简单的模拟限流检查
-    println!("🚦 限流检查: 最大 {} 请求/分钟", max_requests);
-
-    // 这里可以实现真正的限流逻辑
-    // 比如检查 Redis 中的计数器等
-
-    next(ctx).await
 }

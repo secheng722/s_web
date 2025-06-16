@@ -24,7 +24,7 @@ pub use engine::Engine;
 pub use handler::Handler;
 
 /// Middleware system
-pub use middleware::{Middleware, Next};
+pub use middleware::{Middleware, Next,execute_chain};
 
 /// Response types and builders
 pub use response::{IntoResponse, Response, ResponseBuilder};

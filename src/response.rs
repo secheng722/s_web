@@ -114,14 +114,6 @@ impl ResponseBuilder {
             .unwrap()
     }
 
-    /// Create a 500 Internal Server Error response
-    pub fn internal_server_error<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
-    }
 
     pub fn bad_request_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(

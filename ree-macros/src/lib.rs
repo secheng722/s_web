@@ -2,15 +2,15 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, FnArg, ItemFn, Pat, PatIdent};
 
-/// 🚀 中间件宏 - 统一处理参数化和非参数化中间件
+/// 🚀 Middleware macros -Unified processing of parameterized and non-parametric middleware
 /// 
-/// 这个宏可以处理两种类型的中间件：
-/// 1. 带参数的中间件（必须使用宏）
-/// 2. 无参数的中间件（可选使用宏，为了一致性推荐使用）
+/// This macro can handle two types of middleware:
+/// 1. Middleware with parameters (must use macros)
+/// 2. Middleware without parameters (optional use of macros, recommended for consistency)
 /// 
-/// # 使用方式
+/// # How to use
 /// 
-/// ## 方式1: 带参数版本（必须使用宏）
+/// ## Method 1: Parameter version (must use macros)
 /// ```rust
 /// use ree::middleware;
 /// 
@@ -24,70 +24,70 @@ use syn::{parse_macro_input, FnArg, ItemFn, Pat, PatIdent};
 ///     ResponseBuilder::unauthorized_json(r#"{"error": "Unauthorized"}"#)
 /// }
 /// 
-/// // 使用：
+/// // use:
 /// app.use_middleware(auth("Bearer secret-token"));
 /// ```
 /// 
-/// ## 方式2: 无参数版本（可选使用宏，推荐用于一致性）
+/// ## Method 2: No parameter version (optional use of macros, recommended for consistency)
 /// ```rust
 /// #[middleware]
 /// async fn cors(ctx: RequestCtx, next: Next) -> Response {
 ///     let mut response = next(ctx).await;
 ///     response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-///     response
+///     Response
 /// }
 /// 
-/// // 使用：
+/// // use:
 /// app.use_middleware(cors);
 /// ```
 /// 
-/// ## 不使用宏的版本（也完全可以）
+/// ## Version without using macros (it's totally OK)
 /// ```rust
 /// async fn cors(ctx: RequestCtx, next: Next) -> Response {
 ///     let mut response = next(ctx).await;
 ///     response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-///     response
+///     Response
 /// }
 /// 
-/// // 使用：
+/// // use:
 /// app.use_middleware(cors);
 /// ```
 /// 
-/// ## 转换原理
+/// ## Conversion principle
 /// 
-/// 带参数的函数会被转换为：
+/// Functions with parameters will be converted to:
 /// ```rust
 /// fn auth(token: &'static str) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
 ///     move |ctx, next| {
 ///         Box::pin(async move {
-///             // 原始的函数体
+///             // The original function body
 ///         })
 ///     }
 /// }
 /// ```
 /// 
-/// 无参数的函数保持不变，直接作为中间件使用：
+/// Functions without parameters remain unchanged and are used directly as middleware:
 /// ```rust
 /// async fn cors(ctx: RequestCtx, next: Next) -> Response {
-///     // 原始的函数体
+///     // The original function body
 /// }
 /// ```
 /// 
-/// ## 推荐使用方式
+/// ## Recommended usage
 /// 
-/// 为了代码的一致性和可维护性，推荐统一使用 `#[middleware]` 宏：
-/// - ✅ 一致的代码风格
-/// - ✅ 统一的学习成本  
-/// - ✅ 未来扩展的兼容性
-/// - ✅ 更好的错误提示
+/// For code consistency and maintainability, it is recommended to use the `#[middleware]` macro in a unified way:
+/// -✅ Consistent code style
+/// -✅ Unified learning costs  
+/// -✅ Compatibility for future expansions
+/// -✅ Better error prompts
 /// ```
 /// 
-/// 无参数的函数保持不变，直接作为中间件使用。
+/// Functions without parameters remain unchanged and are used directly as middleware.
 #[proc_macro_attribute]
 pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     
-    // 检查函数是否为 async
+    // Check if the function is async
     if input_fn.sig.asyncness.is_none() {
         return syn::Error::new_spanned(
             &input_fn.sig.fn_token,
@@ -100,7 +100,6 @@ pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_body = &input_fn.block;
     let fn_attrs = &input_fn.attrs;
     
-    // 解析参数
     let mut param_args = Vec::new();
     let mut param_names = Vec::new();
     let mut has_ctx = false;
@@ -112,7 +111,7 @@ pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Pat::Ident(PatIdent { ident, .. }) = &*pat_type.pat {
                     let param_name = ident;
                     
-                    // 检查是否为 ctx 或 next 参数
+                    // Check if it is a ctx or next parameter
                     if param_name == "ctx" {
                         has_ctx = true;
                     } else if param_name == "next" {
@@ -140,15 +139,15 @@ pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ).to_compile_error().into();
     }
     
-    // 生成新的函数
+    // Generate new functions
     let expanded = if param_args.is_empty() {
-        // 无参数版本：直接返回原函数
+        // No parameter version: return directly to the original function
         quote! {
             #(#fn_attrs)*
             #fn_vis async fn #fn_name(ctx: ree::RequestCtx, next: ree::Next) -> ree::Response #fn_body
         }
     } else {
-        // 有参数版本：生成参数化中间件
+        // Parameter version: Generate parameterized middleware
         quote! {
             #(#fn_attrs)*
             #fn_vis fn #fn_name(#(#param_args),*) -> impl Fn(ree::RequestCtx, ree::Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = ree::Response> + Send>> + Send + Sync + 'static {

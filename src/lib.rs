@@ -37,7 +37,7 @@ pub use router::Router;
 // =============================================================================
 
 /// 🚀 中间件宏支持 - 让参数化中间件可以写成简洁的 async fn 形式
-pub use ree_macros::{middleware, middleware_fn};
+pub use ree_macros::middleware;
 
 // =============================================================================
 // Re-exports from Dependencies

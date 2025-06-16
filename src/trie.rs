@@ -13,6 +13,7 @@ impl Node {
         Node::default()
     }
 
+    #[allow(dead_code)]
     fn match_child(&self, path: &str) -> Option<&Node> {
         self.children
             .iter()

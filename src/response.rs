@@ -78,6 +78,51 @@ impl ResponseBuilder {
         )
     }
 
+    /// Create a 201 Created response
+    pub fn created<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::CREATED)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    /// Create a 400 Bad Request response
+    pub fn bad_request<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::BAD_REQUEST)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    /// Create a 401 Unauthorized response
+    pub fn unauthorized<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::UNAUTHORIZED)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    /// Create a 403 Forbidden response
+    pub fn forbidden<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
+    /// Create a 500 Internal Server Error response
+    pub fn internal_server_error<T: Into<Bytes>>(chunk: T) -> Response {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .body(full(chunk))
+            .unwrap()
+    }
+
     pub fn bad_request_json<T: Into<Bytes>>(chunk: T) -> Response {
         Self::with_status_and_content_type(
             hyper::StatusCode::BAD_REQUEST,

@@ -79,9 +79,9 @@ impl Router {
 
     /// Handle an HTTP request
     pub async fn handle_request(&self, mut ctx: RequestCtx) -> Response {
-        let method = ctx.request.method().to_string();
-        let path = ctx.request.uri().path().to_string();
-        let (node, params) = self.get_route(&method, &path);
+        let method = ctx.request.method().as_str();
+        let path = ctx.request.uri().path();
+        let (node, params) = self.get_route(method, path);
         
         if node.is_none() {
             return ResponseBuilder::not_found();

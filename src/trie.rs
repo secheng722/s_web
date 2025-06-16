@@ -13,7 +13,13 @@ impl Node {
         Node::default()
     }
 
-    fn match_child(&mut self, path: &str) -> Option<&mut Node> {
+    fn match_child(&self, path: &str) -> Option<&Node> {
+        self.children
+            .iter()
+            .find(|child| child.part == path || child.iswild)
+    }
+
+    fn match_child_mut(&mut self, path: &str) -> Option<&mut Node> {
         self.children
             .iter_mut()
             .find(|child| child.part == path || child.iswild)
@@ -33,7 +39,7 @@ impl Node {
         }
 
         let part = &parts[height];
-        if let Some(child) = self.match_child(part) {
+        if let Some(child) = self.match_child_mut(part) {
             child.insert(pattern, parts, height + 1);
         } else {
             let mut new_node = Node {

@@ -86,6 +86,7 @@ impl RouterGroup {
 }
 
 /// Main HTTP engine for building web applications
+#[derive(Default)]
 pub struct Engine {
     router: Router,
     groups: HashMap<String, RouterGroup>,
@@ -152,85 +153,104 @@ impl Engine {
     pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         let addr = addr.parse::<SocketAddr>()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
+        
+        // Pre-process groups for optimal matching
+        let mut group_data: Vec<(String, Arc<RouterGroup>)> = self.groups
+            .into_iter()
+            .map(|(prefix, group)| (prefix, Arc::new(group)))
+            .collect();
+        
+        // Sort by prefix length (longest first) for better matching
+        group_data.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        
         let router = Arc::new(self.router);
-        let middlewares = Arc::new(self.middlewares);
-        let groups = Arc::new(
-            self.groups
-                .into_iter()
-                .map(|(k, v)| (k, Arc::new(v)))
-                .collect::<HashMap<_, _>>(),
-        );
+        let global_middlewares = Arc::new(self.middlewares);
+        let groups = Arc::new(group_data);
+        
+        // Pre-calculate if we have any middleware for optimization
+        let has_global_middleware = !global_middlewares.is_empty();
+
+        println!("🚀 Server running on http://{}", addr);
 
         loop {
-            let (stream, _) = listener.accept().await?;
+            let (stream, remote_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
-            let router = Arc::clone(&router);
-            let middlewares = Arc::clone(&middlewares);
-            let groups = Arc::clone(&groups);
+            let router = router.clone();
+            let global_middlewares = global_middlewares.clone();
+            let groups = groups.clone();
             
             tokio::task::spawn(async move {
-                if let Err(err) = http1::Builder::new()
-                    .serve_connection(
-                        io,
-                        service_fn(move |req| {
-                            let router = Arc::clone(&router);
-                            let middlewares = Arc::clone(&middlewares);
-                            let groups = Arc::clone(&groups);
+                let service = service_fn(move |req| {
+                    let router = router.clone();
+                    let global_middlewares = global_middlewares.clone();
+                    let groups = groups.clone();
+                    
+                    async move {
+                        let path = req.uri().path();
+                        
+                        // Fast path matching for groups
+                        let matched_group = groups
+                            .iter()
+                            .find(|(prefix, _)| path.starts_with(prefix))
+                            .map(|(_, group)| group.clone());
+
+                        let ctx = match RequestCtx::new(req).await {
+                            Ok(ctx) => ctx,
+                            Err(e) => {
+                                eprintln!("Request context error: {:?}", e);
+                                return Ok("Bad Request".into_response());
+                            }
+                        };
+
+                        let response = if let Some(group) = matched_group {
+                            // Group request handling
+                            let has_group_middleware = !group.middlewares.is_empty();
                             
-                            async move {
-                                // Check if request matches any group
-                                let group = groups
-                                    .iter()
-                                    .find(|(_, g)| req.uri().path().starts_with(&g.prefix))
-                                    .map(|(_, g)| g.clone());
-
-                                let ctx = match RequestCtx::new(req).await {
-                                    Ok(ctx) => ctx,
-                                    Err(_) => {
-                                        return Ok("Bad Request".into_response());
-                                    }
-                                };
-
-                                if let Some(group) = group {
-                                    // Use group-specific handler with combined middleware
-                                    let mut all_middlewares = Vec::new();
-                                    // First apply global middlewares
-                                    all_middlewares.extend(middlewares.iter().cloned());
-                                    // Then apply group-specific middlewares
-                                    all_middlewares.extend(group.middlewares.iter().cloned());
-
-                                    // Create endpoint handler for the group
-                                    let endpoint: Next = Arc::new(move |ctx| {
-                                        let group = Arc::clone(&group);
-                                        Box::pin(async move { group.handle_request(ctx).await })
-                                    });
-
-                                    let resp = execute_chain(&all_middlewares, endpoint, ctx).await;
-                                    return Ok::<_, Infallible>(resp);
-                                }
-
-                                // Use main router with global middleware
+                            if !has_global_middleware && !has_group_middleware {
+                                // Fast path: no middleware at all
+                                group.handle_request(ctx).await
+                            } else {
+                                // Middleware path
+                                let mut combined_middlewares = Vec::with_capacity(
+                                    global_middlewares.len() + group.middlewares.len()
+                                );
+                                combined_middlewares.extend(global_middlewares.iter().cloned());
+                                combined_middlewares.extend(group.middlewares.iter().cloned());
+                                
                                 let endpoint: Next = Arc::new(move |ctx| {
-                                    let router = Arc::clone(&router);
+                                    let group = group.clone();
+                                    Box::pin(async move { group.handle_request(ctx).await })
+                                });
+                                
+                                execute_chain(&combined_middlewares, endpoint, ctx).await
+                            }
+                        } else {
+                            // Main router handling
+                            if !has_global_middleware {
+                                // Fast path: no middleware
+                                router.handle_request(ctx).await
+                            } else {
+                                // Middleware path
+                                let endpoint: Next = Arc::new(move |ctx| {
+                                    let router = router.clone();
                                     Box::pin(async move { router.handle_request(ctx).await })
                                 });
                                 
-                                let resp = execute_chain(&middlewares, endpoint, ctx).await;
-                                Ok::<_, Infallible>(resp)
+                                execute_chain(&global_middlewares, endpoint, ctx).await
                             }
-                        }),
-                    )
+                        };
+
+                        Ok::<_, Infallible>(response)
+                    }
+                });
+
+                if let Err(err) = http1::Builder::new()
+                    .serve_connection(io, service)
                     .await
                 {
-                    eprintln!("Error handling connection: {:?}", err);
+                    eprintln!("Connection error {}: {:?}", remote_addr, err);
                 }
             });
         }
-    }
-}
-
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
     }
 }

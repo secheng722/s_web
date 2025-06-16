@@ -18,6 +18,7 @@ use crate::{
     Handler, 
     Router,
     Middleware,
+    response::IntoResponse,
     Next,
     execute_chain,
 };
@@ -183,9 +184,11 @@ impl Engine {
                                     .find(|(_, g)| req.uri().path().starts_with(&g.prefix))
                                     .map(|(_, g)| g.clone());
 
-                                let ctx = RequestCtx {
-                                    request: req,
-                                    params: HashMap::new(),
+                                let ctx = match RequestCtx::new(req).await {
+                                    Ok(ctx) => ctx,
+                                    Err(_) => {
+                                        return Ok("Bad Request".into_response());
+                                    }
                                 };
 
                                 if let Some(group) = group {

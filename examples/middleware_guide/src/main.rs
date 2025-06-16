@@ -29,7 +29,7 @@ async fn access_log(ctx: RequestCtx, next: Next) -> Response {
 async fn timer(ctx: RequestCtx, next: Next) -> Response {
     let start = Instant::now();
     let response = next(ctx).await;
-    println!("请求处理耗时: {}ms", start.elapsed().as_millis());
+    println!("Request processing time: {}ms", start.elapsed().as_millis());
     response
 }
 
@@ -58,7 +58,7 @@ fn jwt_auth(
                     if let Some(token) = auth_str.strip_prefix("Bearer ") {
                         // 简化的JWT验证逻辑（实际项目中应使用专业的JWT库如jsonwebtoken）
                         if validate_jwt_token(token, secret) {
-                            println!("✅ JWT认证成功: {}", extract_user_from_token(token));
+                            println!("✅ JWT authentication successful: {}", extract_user_from_token(token));
                             return next(ctx).await;
                         }
                     }
@@ -155,7 +155,7 @@ fn request_counter() -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output =
         let counter = counter.clone();
         Box::pin(async move {
             let current = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            println!("总请求数: {}", current + 1);
+            println!("Total requests: {}", current + 1);
             next(ctx).await
         })
     }
@@ -266,7 +266,7 @@ async fn error_handler(ctx: RequestCtx, next: Next) -> Response {
 
     // 如果是错误状态码，添加一些调试信息
     if response.status().is_client_error() || response.status().is_server_error() {
-        println!("⚠️ 错误响应: {} for {} {}", response.status(), method, path);
+        println!("⚠️ Error response: {} for {} {}", response.status(), method, path);
     }
 
     response
@@ -280,18 +280,18 @@ async fn error_handler(ctx: RequestCtx, next: Next) -> Response {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
 
-    println!("🛠 Ree HTTP Framework - 函数式中间件系统");
-    println!("════════════════════════════════════");
-    println!("✨ 全新的函数式中间件API，零开销、易组合！");
+    println!("🛠 Ree HTTP Framework - Function-based Middleware System");
+    println!("════════════════════════════════════════════════════════");
+    println!("✨ Modern function-based middleware API, zero-cost and composable!");
 
     // 1. 全局中间件 - 应用到所有路由
-    println!("1️⃣ 全局中间件 - 应用到所有路由");
+    println!("1️⃣ Global middleware - Applied to all routes");
     app.use_middleware(access_log); // 访问日志
     app.use_middleware(timer); // 计时器
     app.use_middleware(request_counter()); // 请求计数器
 
     // 2. CORS 中间件（支持builder模式）
-    println!("2️⃣ CORS 中间件");
+    println!("2️⃣ CORS middleware");
     app.use_middleware(
         cors()
             .allow_origin("*")
@@ -301,12 +301,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 3. 错误处理和限流中间件
-    println!("3️⃣ 错误处理和限流中间件");
+    println!("3️⃣ Error handling and rate limiting middleware");
     app.use_middleware(error_handler);
     app.use_middleware(rate_limit(100)); // 每分钟最多100个请求
 
     // 4. 自定义中间件 - 直接使用 async 函数
-    println!("4️⃣ 自定义中间件");
+    println!("4️⃣ Custom middleware");
 
     // 简单的日志中间件 - 直接使用 async 函数
     app.use_middleware(|ctx, next| Box::pin(async move {
@@ -316,12 +316,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ctx.request.uri().path()
         );
         let response = next(ctx).await;
-        println!("✅ 响应状态: {}", response.status());
+        println!("✅ Response status: {}", response.status());
         response
     }));
 
     // 5. 路由组中间件
-    println!("5️⃣ 路由组中间件");
+    println!("5️⃣ Route group middleware");
     {
         let api_group = app.group("/api");
 
@@ -333,7 +333,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 组专用的请求验证中间件 - 直接使用 async 函数
         api_group.use_middleware(|ctx, next| Box::pin(async move {
-            println!("🚦 API 组: 验证请求格式");
+            println!("🚦 API Group: Validating request format");
             // 这里可以添加请求格式验证逻辑
             next(ctx).await
         }));
@@ -375,7 +375,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 6. JWT 认证路由组演示
-    println!("6️⃣ JWT 认证路由组");
+    println!("6️⃣ JWT authentication route group");
     {
         let jwt_group = app.group("/jwt");
 
@@ -401,7 +401,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 7. JWT + 角色权限路由组演示
-    println!("7️⃣ JWT + 角色权限路由组");
+    println!("7️⃣ JWT + Role-based permissions route group");
     {
         let admin_group = app.group("/admin");
 
@@ -452,7 +452,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 9. 基础路由（不需要认证）
-    println!("9️⃣ 基础路由（应用全局中间件）");
+    println!("9️⃣ Basic routes (with global middleware)");
 
     app.get("/", |_: RequestCtx| async {
         json!({
@@ -507,26 +507,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!({"error": "资源未找到", "code": 404})
     });
 
-    println!("\n🚀 服务器启动中...");
-    println!("📍 地址: http://127.0.0.1:3000");
-    println!("\n📋 测试路由:");
-    println!("  GET  /                  - 首页");
-    println!("  GET  /health            - 健康检查");
-    println!("  GET  /middleware-test   - 中间件测试");
-    println!("  GET  /error             - 错误处理演示");
-    println!("  GET  /not-found         - 404错误演示");
-    println!("  GET  /api/users         - 需要认证 (Bearer secret-token)");
-    println!("  POST /api/users         - 需要认证 (Bearer secret-token)");
-    println!("  GET  /api/stats         - API统计信息");
-    println!("  POST /auth/login        - 获取JWT token（演示）");
-    println!("  GET  /jwt/profile       - JWT认证用户信息");
-    println!("  GET  /jwt/dashboard     - JWT认证仪表板");
-    println!("  GET  /admin/users       - 管理员用户列表（需要admin角色）");
-    println!("  POST /admin/users       - 管理员创建用户（需要admin角色）");
-    println!("\n💡 测试简单认证API:");
+    println!("\n🚀 Server starting...");
+    println!("📍 Address: http://127.0.0.1:3000");
+    println!("\n📋 Test routes:");
+    println!("  GET  /                  - Home page");
+    println!("  GET  /health            - Health check");
+    println!("  GET  /middleware-test   - Middleware test");
+    println!("  GET  /error             - Error handling demo");
+    println!("  GET  /not-found         - 404 error demo");
+    println!("  GET  /api/users         - Requires authentication (Bearer secret-token)");
+    println!("  POST /api/users         - Requires authentication (Bearer secret-token)");
+    println!("  GET  /api/stats         - API statistics");
+    println!("  POST /auth/login        - Get JWT token (demo)");
+    println!("  GET  /jwt/profile       - JWT authenticated user info");
+    println!("  GET  /jwt/dashboard     - JWT authenticated dashboard");
+    println!("  GET  /admin/users       - Admin user list (requires admin role)");
+    println!("  POST /admin/users       - Admin create user (requires admin role)");
+    println!("\n💡 Test simple authentication API:");
     println!("  curl -H 'Authorization: Bearer secret-token' http://127.0.0.1:3000/api/users");
-    println!("\n🔐 测试JWT认证:");
-    println!("  1. 获取token: curl -X POST http://127.0.0.1:3000/auth/login");
+    println!("\n🔐 Test JWT authentication:");
+    println!("  1. Get token: curl -X POST http://127.0.0.1:3000/auth/login");
     println!(
         "  2. 使用token: curl -H 'Authorization: Bearer <admin_token>' http://127.0.0.1:3000/jwt/profile"
     );

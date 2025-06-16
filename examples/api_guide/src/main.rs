@@ -1,19 +1,19 @@
-use ree::{Engine,  ResponseBuilder,RequestCtx};
+use ree::{Engine,  ResponseBuilder};
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
     
-    println!("🎯 Ree HTTP Framework - API使用指南");
-    println!("═══════════════════════════════════════");
-    println!("✨ 统一的API设计 - 自动类型转换！");
-    println!("   🎉 所有处理函数都支持直接返回各种类型");
-    println!("   🚀 框架自动转换为HTTP响应，无需手动包装");
+    println!("🎯 Ree HTTP Framework - API Usage Guide");
+    println!("═══════════════════════════════════════════");
+    println!("✨ Unified API Design - Automatic Type Conversion!");
+    println!("   🎉 All handler functions support direct return of various types");
+    println!("   🚀 Framework automatically converts to HTTP responses, no manual wrapping");
     println!();
     
     // ========== 统一API: 直接返回各种类型，自动转换 ==========
-    println!("🚀 统一API: 支持自动类型转换的各种返回类型");
+    println!("🚀 Unified API: Various return types with automatic type conversion");
     
     // 返回 &str -> text/plain
     app.get("/simple/text", |_| async { 
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.delete("/simple/delete/:id", |_| async { () });
     
     // ========== 高级用法: 当需要精确控制时直接返回 Response ==========
-    println!("🔧 高级用法: 直接返回 Response - 精确控制HTTP响应");
+    println!("🔧 Advanced usage: Direct Response return - Precise HTTP response control");
     
     // 自定义响应头
     app.get("/advanced/headers", |_| async {
@@ -145,31 +145,109 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "This doesn't use handler() wrapper - same result!" 
     });
     
+    // ========== POST Request Body Examples ==========
+    println!("📮 POST Request Examples - Body Reading");
+    
+    // JSON body parsing
+    app.post("/post/json", |ctx: ree::RequestCtx| async move {
+        match ctx.body_json::<serde_json::Value>() {
+            Ok(Some(json)) => format!("Received JSON: {}", json),
+            Ok(None) => "No body provided".to_string(),
+            Err(e) => format!("Failed to parse JSON: {}", e),
+        }
+    });
+    
+    // Text body reading
+    app.post("/post/text", |ctx: ree::RequestCtx| async move {
+        match ctx.body_string() {
+            Ok(Some(text)) => format!("Received text: {}", text),
+            Ok(None) => "No body provided".to_string(),
+            Err(e) => format!("Failed to read text: {}", e),
+        }
+    });
+    
+    // Raw bytes body reading
+    app.post("/post/bytes", |ctx: ree::RequestCtx| async move {
+        match ctx.body_bytes() {
+            Some(bytes) => format!("Received {} bytes", bytes.len()),
+            None => "No body provided".to_string(),
+        }
+    });
+    
+    // Form data example (simple parsing)
+    app.post("/post/form", |ctx: ree::RequestCtx| async move {
+        match ctx.body_string() {
+            Ok(Some(body)) => {
+                // Simple form parsing (in real app, use a proper form parser)
+                let params: std::collections::HashMap<&str, &str> = body
+                    .split('&')
+                    .filter_map(|pair| {
+                        let mut parts = pair.split('=');
+                        Some((parts.next()?, parts.next()?))
+                    })
+                    .collect();
+                
+                format!("Form data: {:?}", params)
+            },
+            Ok(None) => "No form data provided".to_string(),
+            Err(e) => format!("Failed to read form: {}", e),
+        }
+    });
+
     println!("✅ Server starting on http://127.0.0.1:8080");
-    println!("\n📋 测试端点列表:");
+    println!("\n📋 Test endpoints list:");
     println!("   ┌─────────────────────────────────────────────────────────┐");
-    println!("   │ 🚀 统一API - 自动类型转换                              │");
+    println!("   │ 🚀 Unified API - Automatic Type Conversion             │");
     println!("   ├─────────────────────────────────────────────────────────┤");
     println!("   │ GET    /simple/text       - &str → text/plain          │");
     println!("   │ GET    /simple/string     - String → text/plain        │");
     println!("   │ GET    /simple/json       - JSON → application/json    │");
-    println!("   │ GET    /simple/greet/:name - 路径参数处理               │");
-    println!("   │ GET    /simple/result/:action - Result<T,E> 处理       │");
-    println!("   │ GET    /simple/find/:id   - Option<T> 处理             │");
-    println!("   │ POST   /simple/create     - (StatusCode, T) 元组       │");
+    println!("   │ GET    /simple/greet/:name - Path parameter handling    │");
+    println!("   │ GET    /simple/result/:action - Result<T,E> handling    │");
+    println!("   │ GET    /simple/find/:id   - Option<T> handling          │");
+    println!("   │ POST   /simple/create     - (StatusCode, T) tuple       │");
     println!("   │ DELETE /simple/delete/:id - () → 204 No Content        │");
     println!("   ├─────────────────────────────────────────────────────────┤");
-    println!("   │ 🔧 高级控制 - 直接返回 Response                        │");
+    println!("   │ � POST Request Body Examples                          │");
     println!("   ├─────────────────────────────────────────────────────────┤");
-    println!("   │ GET    /advanced/headers  - 自定义响应头               │");
-    println!("   │ GET    /advanced/custom   - 自定义状态码/内容类型      │");
-    println!("   │ GET    /advanced/page     - HTML 页面                  │");
-    println!("   │ GET    /advanced/error    - 自定义错误响应             │");
+    println!("   │ POST   /post/json         - JSON body parsing          │");
+    println!("   │ POST   /post/text         - Text body reading          │");
+    println!("   │ POST   /post/bytes        - Raw bytes reading          │");
+    println!("   │ POST   /post/form         - Form data parsing          │");
+    println!("   ├─────────────────────────────────────────────────────────┤");
+    println!("   │ 🔧 Advanced Control - Direct Response Return           │");
+    println!("   ├─────────────────────────────────────────────────────────┤");
+    println!("   │ GET    /advanced/headers  - Custom response headers    │");
+    println!("   │ GET    /advanced/custom   - Custom status/content type │");
+    println!("   │ GET    /advanced/page     - HTML page                  │");
+    println!("   │ GET    /advanced/error    - Custom error response      │");
     println!("   └─────────────────────────────────────────────────────────┘");
-    println!("\n💡 新的API设计优势:");
-    println!("   • ✨ 统一简洁：无需区分两种使用方式");
-    println!("   • 🚀 自动转换：支持 &str, String, JSON, Result, Option 等");
-    println!("   • 🔧 精确控制：需要时仍可直接返回 Response");
+    println!("\n💡 New API Design Advantages:");
+    println!("   • ✨ Unified & Simple: No need to distinguish usage styles");
+    println!("   • 🚀 Auto Conversion: Supports &str, String, JSON, Result, Option etc");
+    println!("   • 📮 Body Reading: Easy POST/PUT request body access");
+    println!("   • 🔧 Flexible Control: Direct Response return when needed");
+    
+    println!("\n🧪 Test POST requests with curl:");
+    println!("   # JSON body");
+    println!("   curl -X POST http://127.0.0.1:8080/post/json \\");
+    println!("        -H 'Content-Type: application/json' \\");
+    println!("        -d '{{\"name\": \"Alice\", \"age\": 30}}'");
+    println!("   ");
+    println!("   # Raw bytes body");
+    println!("   curl -X POST http://127.0.0.1:8080/post/bytes \\");
+    println!("        -H 'Content-Type: application/octet-stream' \\");
+    println!("        --data-binary 'Hello, raw bytes!'");
+    println!("   ");
+    println!("   # Text body");
+    println!("   curl -X POST http://127.0.0.1:8080/post/text \\");
+    println!("        -H 'Content-Type: text/plain' \\");
+    println!("        -d 'Hello from curl!'");
+    println!("   ");
+    println!("   # Form data");
+    println!("   curl -X POST http://127.0.0.1:8080/post/form \\");
+    println!("        -H 'Content-Type: application/x-www-form-urlencoded' \\");
+    println!("        -d 'name=Alice&email=alice@example.com&age=30'");
     
     app.run("127.0.0.1:8080").await?;
     Ok(())

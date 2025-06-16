@@ -116,7 +116,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     <h2>统一API设计</h2>
                     <p><strong>自动转换</strong>：所有处理函数都支持直接返回各种类型</p>
                     <p><strong>灵活可控</strong>：需要精确控制时仍可直接返回 <code>Response</code></p>
-                    <p><strong>向后兼容</strong>：<code>handler()</code> 函数仍然可用但不再必需</p>
                 </div>
                 <h3>🔗 测试链接</h3>
                 <ul>

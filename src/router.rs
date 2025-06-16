@@ -117,7 +117,7 @@ mod tests {
             "/hello",
             Box::new(|_ctx| async { ResponseBuilder::with_text("Hello!") }),
         );
-        println!("{:?}", router.roots);
+        assert_eq!(router.roots.len(), 2);
     }
 
     #[test]

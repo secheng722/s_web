@@ -24,7 +24,7 @@ pub use engine::Engine;
 pub use handler::Handler;
 
 /// Middleware system
-pub use middleware::{Middleware, Next,execute_chain};
+pub use middleware::{Middleware, Next, execute_chain};
 
 /// Response types and builders
 pub use response::{IntoResponse, Response, ResponseBuilder};
@@ -37,7 +37,6 @@ pub use router::Router;
 // =============================================================================
 
 /// 🚀 中间件宏支持 - 让参数化中间件可以写成简洁的 async fn 形式
-#[cfg(feature = "macros")]
 pub use ree_macros::{middleware, middleware_fn};
 
 // =============================================================================

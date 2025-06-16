@@ -15,8 +15,4 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 
 # 宏支持
-ree-macros = { path = "./ree-macros", optional = true }
-
-[features]
-default = ["macros"]
-macros = ["ree-macros"]
+ree-macros = { path = "./ree-macros" }

@@ -386,9 +386,19 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "ree-macros",
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "ree-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

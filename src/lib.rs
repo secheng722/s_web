@@ -27,7 +27,7 @@ pub use handler::Handler;
 pub use middleware::{Middleware, Next, execute_chain};
 
 /// Response types and builders
-pub use response::{IntoResponse, Response, ResponseBuilder};
+pub use response::{ResponseBuilder, IntoResponse, Response, full, empty};
 
 /// Internal router (typically not needed for end users)
 pub use router::Router;

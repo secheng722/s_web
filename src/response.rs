@@ -5,165 +5,97 @@ use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
 
 pub type Response = hyper::Response<BoxBody<Bytes, hyper::Error>>;
 
-fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
+/// Create a full body from any type that can convert to Bytes
+pub fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
     Full::new(chunk.into())
         .map_err(|never| match never {})
         .boxed()
 }
 
-/// Builder for creating HTTP responses
-pub struct ResponseBuilder;
+/// Create an empty body
+pub fn empty() -> BoxBody<Bytes, hyper::Error> {
+    Empty::<Bytes>::new()
+        .map_err(|never| match never {})
+        .boxed()
+}
+
+/// A builder for creating HTTP responses with method chaining
+pub struct ResponseBuilder {
+    builder: hyper::http::response::Builder,
+}
 
 impl ResponseBuilder {
-    pub fn with_text<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::OK)
-            .header("Content-Type", "text/plain; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
+    /// Start building a new response
+    pub fn new() -> Self {
+        Self {
+            builder: hyper::Response::builder(),
+        }
     }
 
-    pub fn with_json<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::OK)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
+    /// Set the status code
+    pub fn status(mut self, status: hyper::StatusCode) -> Self {
+        self.builder = self.builder.status(status);
+        self
     }
 
-    pub fn with_html<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::OK)
-            .header("Content-Type", "text/html; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
+    /// Add a header
+    pub fn header<V>(mut self, key: &str, value: V) -> Self
+    where
+        V: AsRef<str>,
+    {
+        self.builder = self.builder.header(key, value.as_ref());
+        self
     }
 
-    pub fn empty() -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::OK)
-            .body(
-                Empty::<Bytes>::new()
-                    .map_err(|never| match never {})
-                    .boxed(),
-            )
-            .unwrap()
+    /// Set content type
+    pub fn content_type(self, content_type: &str) -> Self {
+        self.header("Content-Type", content_type)
     }
 
-    pub fn with_status_and_content_type<T: Into<Bytes>>(
-        status: hyper::StatusCode,
-        content_type: &str,
-        chunk: T,
-    ) -> Response {
-        hyper::Response::builder()
-            .status(status)
-            .header("Content-Type", content_type)
-            .body(full(chunk))
-            .unwrap()
+    /// Build response with body
+    pub fn body<T: Into<Bytes>>(self, body: T) -> Response {
+        self.builder.body(full(body)).unwrap()
     }
 
+    /// Build response with empty body
+    pub fn empty_body(self) -> Response {
+        self.builder.body(empty()).unwrap()
+    }
+
+    /// Build an HTML response
+    pub fn html<T: Into<Bytes>>(body: T) -> Response {
+        Self::new()
+            .content_type("text/html; charset=utf-8")
+            .body(body)
+    }
+
+    /// Build a 404 response
     pub fn not_found() -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::NOT_FOUND,
-            "text/plain; charset=utf-8",
-            "404 Not Found",
-        )
+        Self::new()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .content_type("text/plain; charset=utf-8")
+            .body("404 Not Found")
     }
 
-    pub fn internal_server_error() -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-            "text/plain; charset=utf-8",
-            "500 Internal Server Error",
-        )
+    /// Build a 500 response
+    pub fn internal_error() -> Response {
+        Self::new()
+            .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+            .content_type("text/plain; charset=utf-8")
+            .body("500 Internal Server Error")
     }
 
-    /// Create a 201 Created response
-    pub fn created<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::CREATED)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
-    }
-
-    /// Create a 400 Bad Request response
-    pub fn bad_request<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::BAD_REQUEST)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
-    }
-
-    /// Create a 401 Unauthorized response
-    pub fn unauthorized<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::UNAUTHORIZED)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
-    }
-
-    /// Create a 403 Forbidden response
-    pub fn forbidden<T: Into<Bytes>>(chunk: T) -> Response {
-        hyper::Response::builder()
-            .status(hyper::StatusCode::FORBIDDEN)
-            .header("Content-Type", "application/json; charset=utf-8")
-            .body(full(chunk))
-            .unwrap()
-    }
-
-
-    pub fn bad_request_json<T: Into<Bytes>>(chunk: T) -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::BAD_REQUEST,
-            "application/json; charset=utf-8",
-            chunk,
-        )
-    }
-
-    pub fn unauthorized_json<T: Into<Bytes>>(chunk: T) -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::UNAUTHORIZED,
-            "application/json; charset=utf-8",
-            chunk,
-        )
-    }
-
-    pub fn forbidden_json<T: Into<Bytes>>(chunk: T) -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::FORBIDDEN,
-            "application/json; charset=utf-8",
-            chunk,
-        )
-    }
-
-    pub fn too_many_requests_json<T: Into<Bytes>>(chunk: T) -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::TOO_MANY_REQUESTS,
-            "application/json; charset=utf-8",
-            chunk,
-        )
-    }
-
-    pub fn created_json<T: Into<Bytes>>(chunk: T) -> Response {
-        Self::with_status_and_content_type(
-            hyper::StatusCode::CREATED,
-            "application/json; charset=utf-8",
-            chunk,
-        )
-    }
-
+    /// Build a 204 No Content response
     pub fn no_content() -> Response {
-        hyper::Response::builder()
+        Self::new()
             .status(hyper::StatusCode::NO_CONTENT)
-            .body(
-                Empty::<Bytes>::new()
-                    .map_err(|never| match never {})
-                    .boxed(),
-            )
-            .unwrap()
+            .empty_body()
+    }
+}
+
+impl Default for ResponseBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -174,27 +106,39 @@ pub trait IntoResponse {
 
 impl IntoResponse for &str {
     fn into_response(self) -> Response {
-        ResponseBuilder::with_text(self.to_string())
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::OK)
+            .content_type("text/plain; charset=utf-8")
+            .body(self.to_string())
     }
 }
 
 impl IntoResponse for String {
     fn into_response(self) -> Response {
-        ResponseBuilder::with_text(self)
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::OK)
+            .content_type("text/plain; charset=utf-8")
+            .body(self)
     }
 }
 
 impl IntoResponse for &String {
     fn into_response(self) -> Response {
-        ResponseBuilder::with_text(self.clone())
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::OK)
+            .content_type("text/plain; charset=utf-8")
+            .body(self.clone())
     }
 }
 
 impl IntoResponse for serde_json::Value {
     fn into_response(self) -> Response {
         match serde_json::to_string(&self) {
-            Ok(json_str) => ResponseBuilder::with_json(json_str),
-            Err(_) => ResponseBuilder::internal_server_error(),
+            Ok(json_str) => ResponseBuilder::new()
+                .status(hyper::StatusCode::OK)
+                .content_type("application/json; charset=utf-8")
+                .body(json_str),
+            Err(_) => ResponseBuilder::internal_error(),
         }
     }
 }
@@ -202,39 +146,39 @@ impl IntoResponse for serde_json::Value {
 impl IntoResponse for &serde_json::Value {
     fn into_response(self) -> Response {
         match serde_json::to_string(self) {
-            Ok(json_str) => ResponseBuilder::with_json(json_str),
-            Err(_) => ResponseBuilder::internal_server_error(),
+            Ok(json_str) => ResponseBuilder::new()
+                .status(hyper::StatusCode::OK)
+                .content_type("application/json; charset=utf-8")
+                .body(json_str),
+            Err(_) => ResponseBuilder::internal_error(),
         }
     }
 }
 
 impl IntoResponse for Vec<u8> {
     fn into_response(self) -> Response {
-        hyper::Response::builder()
+        ResponseBuilder::new()
             .status(hyper::StatusCode::OK)
-            .header("Content-Type", "application/octet-stream")
-            .body(full(self))
-            .unwrap()
+            .content_type("application/octet-stream")
+            .body(self)
     }
 }
 
 impl IntoResponse for &[u8] {
     fn into_response(self) -> Response {
-        hyper::Response::builder()
+        ResponseBuilder::new()
             .status(hyper::StatusCode::OK)
-            .header("Content-Type", "application/octet-stream")
-            .body(full(self.to_vec()))
-            .unwrap()
+            .content_type("application/octet-stream")
+            .body(self.to_vec())
     }
 }
 
 impl IntoResponse for Bytes {
     fn into_response(self) -> Response {
-        hyper::Response::builder()
+        ResponseBuilder::new()
             .status(hyper::StatusCode::OK)
-            .header("Content-Type", "application/octet-stream")
-            .body(full(self))
-            .unwrap()
+            .content_type("application/octet-stream")
+            .body(self)
     }
 }
 
@@ -252,11 +196,10 @@ where
     fn into_response(self) -> Response {
         match self {
             Ok(value) => value.into_response(),
-            Err(err) => ResponseBuilder::with_status_and_content_type(
-                hyper::StatusCode::INTERNAL_SERVER_ERROR,
-                "text/plain; charset=utf-8",
-                format!("Error: {}", err),
-            ),
+            Err(err) => ResponseBuilder::new()
+                .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+                .content_type("text/plain; charset=utf-8")
+                .body(format!("Error: {}", err)),
         }
     }
 }

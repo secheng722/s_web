@@ -102,20 +102,18 @@ impl Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ResponseBuilder;
-
     #[test]
     fn test_new_router() {
         let mut router = Router::new();
         router.add_route(
             "GET",
             "/",
-            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello, World!") }),
+            Box::new(|_ctx| async { "Hello, World!" }),
         );
         router.add_route(
             "GET",
             "/hello",
-            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello!") }),
+            Box::new(|_ctx| async { "Hello!" }),
         );
         assert_eq!(router.roots.len(), 2);
     }
@@ -133,7 +131,7 @@ mod tests {
         router.add_route(
             "GET",
             "/p/:lang/doc",
-            Box::new(|_ctx| async { ResponseBuilder::with_text("Hello, World!") }),
+            Box::new(|_ctx| async { "Hello, World!" }),
         );
         let (node, params) = router.get_route("GET", "/p/rust/doc");
         assert!(node.is_some());

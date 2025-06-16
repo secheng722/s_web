@@ -23,10 +23,10 @@ tokio = { version = "1.45.1", features = ["full"] }
 serde_json = "1.0"
 ```
 
-### Simple Handler Approach (Recommended)
+### Simple Handler Examples
 
 ```rust
-use ree::{Engine, handler};
+use ree::Engine;
 use serde_json::json;
 
 #[tokio::main]
@@ -34,48 +34,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
     
     // Return &str directly - automatically converted to text/plain response
-    app.get("/hello", handler(|_| async { "Hello, World!" }));
+    app.get("/hello", |_| async { "Hello, World!" });
     
     // Return String directly
-    app.get("/time", handler(|_| async { 
+    app.get("/time", |_| async { 
         format!("Current time: {}", std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap().as_secs())
-    }));
+    });
     
     // Return JSON directly - automatically converted to application/json response
-    app.get("/json", handler(|_| async { 
+    app.get("/json", |_| async { 
         json!({
             "message": "Hello JSON",
-            "status": "success"
+            "framework": "Ree",
+            "version": "0.1.0"
         })
-    }));
+    });
     
     // Use path parameters
-    app.get("/hello/:name", handler(|ctx| async move {
+    app.get("/hello/:name", |ctx| async move {
         if let Some(name) = ctx.get_param("name") {
             format!("Hello, {}!", name)
         } else {
             "Hello, Anonymous!".to_string()
         }
-    }));
+    });
     
     // Return Result - automatically handle errors
-    app.get("/result", handler(|_| async {
+    app.get("/result", |_| async {
         let result: Result<&str, &str> = Ok("Success!");
         result  // Ok -> 200, Err -> 500
-    }));
+    });
     
     // Return Option - automatically handle None
-    app.get("/option", handler(|_| async {
+    app.get("/option", |_| async {
         let data: Option<&str> = Some("Found!");
         data  // Some -> 200, None -> 404
-    }));
+    });
     
-    // Custom status code
-    app.get("/created", handler(|_| async {
+    // Custom status code with tuple
+    app.get("/created", |_| async {
         (ree::StatusCode::CREATED, "Resource created")
-    }));
+    });
     
     app.run("127.0.0.1:8080").await?;
     Ok(())
@@ -118,26 +119,26 @@ let mut app = Engine::new();
 let api_v1 = app.group("/api/v1");
 api_v1.use_middleware(request_logger);
 api_v1.use_middleware(auth("Bearer api-v1-token"));
-api_v1.get("/users", handler(|_| async { "API v1 users" }));
-api_v1.post("/users", handler(|_| async { "Create user in v1" }));
+api_v1.get("/users", |_| async { "API v1 users" });
+api_v1.post("/users", |_| async { "Create user in v1" });
 
 // API v2 group with different auth
 let api_v2 = app.group("/api/v2");
 api_v2.use_middleware(jwt_auth("v2-secret"));
-api_v2.get("/users", handler(|_| async { "API v2 users" }));
+api_v2.get("/users", |_| async { "API v2 users" });
 
 // Admin group with multiple middleware
 let admin = app.group("/admin");
 admin.use_middleware(jwt_auth("admin-secret"));
 admin.use_middleware(require_role("admin"));
-admin.get("/users", handler(|_| async { "Admin users list" }));
-admin.delete("/users/:id", handler(|ctx| async move {
+admin.get("/users", |_| async { "Admin users list" });
+admin.delete("/users/:id", |ctx| async move {
     if let Some(id) = ctx.get_param("id") {
         format!("Deleted user {}", id)
     } else {
         "Invalid user ID".to_string()
     }
-}));
+});
 ```
 
 ## 🛠 Revolutionary Middleware System
@@ -195,14 +196,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let api = app.group("/api");
         api.use_middleware(auth("Bearer secret-token"));
-        api.get("/users", handler(|_| async { "Protected users data" }));
+        api.get("/users", |_| async { "Protected users data" });
     }
     
     // JWT protected routes
     {
         let secure = app.group("/secure");  
         secure.use_middleware(jwt_auth("my-secret-key"));
-        secure.get("/profile", handler(|_| async { "User profile" }));
+        secure.get("/profile", |_| async { "User profile" });
     }
     
     app.run("127.0.0.1:8080").await?;
@@ -412,7 +413,7 @@ api.post("/users", handler);
 ## 🎯 Design Philosophy
 
 ### Simplicity First
-- Use `handler()` with automatic type conversion for 99% of use cases
+- Direct closure usage with automatic type conversion for 99% of use cases
 - The framework handles HTTP response complexity for you
 - Write natural Rust code, get HTTP responses automatically
 

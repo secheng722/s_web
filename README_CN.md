@@ -26,7 +26,7 @@ serde_json = "1.0"
 ### 简单处理器示例
 
 ```rust
-use ree::{Engine, handler};
+use ree::Engine;
 use serde_json::json;
 
 #[tokio::main]
@@ -34,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
     
     // 直接返回 &str - 自动转换为 text/plain 响应
-    app.get("/hello", handler(|_| async { "Hello, World!" }));
+    app.get("/hello", |_| async { "Hello, World!" });
     
     // 直接返回 JSON - 自动转换为 application/json 响应
-    app.get("/json", handler(|_| async { 
+    app.get("/json", |_| async { 
         json!({
             "message": "你好 JSON",
             "framework": "Ree",
@@ -46,25 +46,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
     
     // 使用路径参数
-    app.get("/hello/:name", handler(|ctx| async move {
+    app.get("/hello/:name", |ctx| async move {
         if let Some(name) = ctx.get_param("name") {
             format!("你好, {}!", name)
         } else {
             "你好, 匿名用户!".to_string()
         }
-    }));
+    });
     
     // 返回 Result - 自动处理错误
-    app.get("/result", handler(|_| async {
+    app.get("/result", |_| async {
         let result: Result<&str, &str> = Ok("成功!");
         result  // Ok -> 200, Err -> 500
     }));
     
     // 返回 Option - 自动处理 None
-    app.get("/option", handler(|_| async {
+    app.get("/option", |_| async {
         let data: Option<&str> = Some("找到了!");
         data  // Some -> 200, None -> 404
-    }));
+    });
     
     // 自定义状态码
     app.get("/created", handler(|_| async {
@@ -131,14 +131,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let api = app.group("/api");
         api.use_middleware(auth("Bearer secret-token"));
-        api.get("/users", handler(|_| async { "受保护的用户数据" }));
+        api.get("/users", |_| async { "受保护的用户数据" });
     }
     
     // JWT 保护的路由
     {
         let secure = app.group("/secure");  
         secure.use_middleware(jwt_auth("my-secret-key"));
-        secure.get("/profile", handler(|_| async { "用户个人资料" }));
+        secure.get("/profile", |_| async { "用户个人资料" });
     }
     
     app.run("127.0.0.1:8080").await?;
@@ -445,7 +445,7 @@ cargo run --example large_app_example
 ## 🎯 设计理念
 
 ### 简洁优先
-- 在 99% 的用例中使用 `handler()` 和自动类型转换
+- 在 99% 的用例中直接使用闭包和自动类型转换
 - 框架为你处理 HTTP 响应的复杂性
 - 编写自然的 Rust 代码，自动获得 HTTP 响应
 

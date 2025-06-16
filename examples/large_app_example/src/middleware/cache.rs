@@ -1,19 +1,20 @@
 // middleware/cache.rs
-use ree::{middleware, MiddlewareFn};
+use ree::{RequestCtx, Next, Response};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::{future::Future, pin::Pin};
 
 /// Simple in-memory cache middleware
-pub fn cache_response(seconds: u64) -> MiddlewareFn {
+pub fn cache_response(seconds: u64) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
     // Shared cache store
     let cache = Arc::new(Mutex::new(HashMap::new()));
     
-    middleware(move |ctx, next| {
+    move |ctx, next| {
         let cache = cache.clone();
         let ttl = Duration::from_secs(seconds);
         
-        async move {
+        Box::pin(async move {
             // Generate cache key from request path and query
             let cache_key = format!(
                 "{}{}",
@@ -41,6 +42,6 @@ pub fn cache_response(seconds: u64) -> MiddlewareFn {
             cache_ref.insert(cache_key, (Instant::now(), response.clone()));
             
             response
-        }
-    })
+        })
+    }
 }

@@ -1,45 +1,39 @@
-//! 简化的函数式中间件系统
+//! Ultra-simplified middleware system
+//! 
+//! This middleware system allows using async functions directly as middleware,
+//! providing a clean and intuitive API without boilerplate.
 
 use std::{sync::Arc, future::Future, pin::Pin};
 use crate::{RequestCtx, Response};
 
-/// 中间件函数类型
-pub type MiddlewareFn = Arc<dyn Fn(RequestCtx, MiddlewareNext) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+/// A middleware function that processes a request and passes it to the next handler
+pub type Middleware = Arc<dyn Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
-/// 下一个处理器的类型
-pub type MiddlewareNext = Arc<dyn Fn(RequestCtx) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+/// The next handler in the middleware chain
+pub type Next = Arc<dyn Fn(RequestCtx) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
-/// 执行中间件链的函数
-pub fn execute_middleware_chain(
-    middlewares: &[MiddlewareFn],
-    endpoint: MiddlewareNext,
-    ctx: RequestCtx,
-) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+/// Execute a chain of middlewares
+pub async fn execute_chain(middlewares: &[Middleware], endpoint: Next, ctx: RequestCtx) -> Response {
     if middlewares.is_empty() {
-        return endpoint(ctx);
+        return endpoint(ctx).await;
     }
     
     let (first, rest) = middlewares.split_first().unwrap();
-    let next = create_next_fn(rest, endpoint);
-    first(ctx, next)
+    let next = create_next(rest, endpoint);
+    first(ctx, next).await
 }
 
-/// 创建下一个处理器函数
-fn create_next_fn(
-    remaining_middlewares: &[MiddlewareFn],
-    endpoint: MiddlewareNext,
-) -> MiddlewareNext {
-    let remaining = remaining_middlewares.to_vec();
+/// Create the next middleware function
+fn create_next(remaining: &[Middleware], endpoint: Next) -> Next {
+    let middlewares = remaining.to_vec();
+    let endpoint = endpoint.clone();
+    
     Arc::new(move |ctx| {
-        execute_middleware_chain(&remaining, endpoint.clone(), ctx)
+        let middlewares = middlewares.clone();
+        let endpoint = endpoint.clone();
+        
+        Box::pin(async move {
+            execute_chain(&middlewares, endpoint, ctx).await
+        })
     })
-}
-
-/// 创建中间件的便利函数
-pub fn middleware<F, Fut>(f: F) -> MiddlewareFn
-where
-    F: Fn(RequestCtx, MiddlewareNext) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Response> + Send + 'static,
-{
-    Arc::new(move |ctx, next| Box::pin(f(ctx, next)))
 }

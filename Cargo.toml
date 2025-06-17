@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "core",
-    "examples/api_guide",
-    "examples/middleware_guide", 
+    "examples/api_example",
+    "examples/middleware_example", 
     "examples/database_example",
     "examples/article_system_example",
 ]

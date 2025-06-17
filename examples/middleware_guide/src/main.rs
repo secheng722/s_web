@@ -1,6 +1,6 @@
-use ree::{Engine, Next, RequestCtx, Response, ResponseBuilder};
+use ree::{Engine, IntoResponse, Next, RequestCtx, Response, ResponseBuilder};
 use serde_json::json;
-use std::{future::Future, sync::Arc, time::Instant};
+use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
 
 // =============================================================================
 // 🎉 REE中间件系统 - 使用更简洁的中间件写法
@@ -41,15 +41,15 @@ use std::{future::Future, sync::Arc, time::Instant};
 // =============================================================================
 
 /// 🚀 访问日志中间件
-async fn access_log(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
+async fn _access_log(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let start = Instant::now();
     let method = ctx.request.method().to_string();
     let path = ctx.request.uri().path().to_string();
 
     println!("[{}] 开始处理请求: {} {}", prefix, method, path);
-    
+
     let response = next(ctx).await;
-    
+
     println!(
         "[{}] 完成请求: {} {} {} {}ms",
         prefix,
@@ -70,6 +70,7 @@ async fn timer(name: &'static str, ctx: RequestCtx, next: Next) -> Response {
     response
 }
 
+#[allow(dead_code)]
 /// 🚀 认证中间件
 async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
     if let Some(auth) = ctx.request.headers().get("Authorization") {
@@ -77,7 +78,11 @@ async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
             return next(ctx).await;
         }
     }
-    ResponseBuilder::unauthorized_json(r#"{"error": "Unauthorized"}"#)
+    (
+        ree::StatusCode::UNAUTHORIZED,
+        json!({"error": "Unauthorized"}),
+    )
+        .into_response()
 }
 
 /// 🔐 简单认证中间件
@@ -87,12 +92,9 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
         Some(header) => header,
         None => {
             return ResponseBuilder::new()
-                .status(hyper::StatusCode::UNAUTHORIZED)
+                .status(ree::StatusCode::UNAUTHORIZED)
                 .header("Content-Type", "application/json")
-                .json(json!({
-                    "error": "未提供认证信息",
-                    "message": "请在Authorization头中提供有效的令牌"
-                }));
+                .body(json!({"error": "缺少认证头"}).to_string());
         }
     };
 
@@ -101,21 +103,24 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
         Ok(s) => s,
         Err(_) => {
             return ResponseBuilder::new()
-                .status(hyper::StatusCode::BAD_REQUEST)
+                .status(ree::StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
-                .json(json!({"error": "无效的认证头"}));
+                .body(json!({"error": "无效的认证头"}).to_string());
         }
     };
 
     // 检查令牌是否有效
     if auth_str != format!("Bearer {}", token_value) {
         return ResponseBuilder::new()
-            .status(hyper::StatusCode::FORBIDDEN)
+            .status(ree::StatusCode::FORBIDDEN)
             .header("Content-Type", "application/json")
-            .json(json!({
-                "error": "无效的令牌",
-                "message": "提供的认证令牌无效或已过期"
-            }));
+            .body(
+                json!({
+                    "error": "无效的令牌",
+                    "message": "提供的认证令牌无效或已过期"
+                })
+                .to_string(),
+            );
     }
 
     // 认证通过，继续处理请求
@@ -140,7 +145,11 @@ async fn jwt_auth(secret: &'static str, ctx: RequestCtx, next: Next) -> Response
         }
     }
 
-    ResponseBuilder::unauthorized_json(r#"{"error": "Invalid or missing JWT token"}"#)
+    (
+        ree::StatusCode::UNAUTHORIZED,
+        json!({"error": "Invalid or missing JWT token"}),
+    )
+        .into_response()
 }
 
 /// 简化的JWT验证函数（仅用于演示）
@@ -164,7 +173,8 @@ fn validate_jwt_token(token: &str, _secret: &str) -> bool {
             .unwrap()
             .as_secs();
 
-        !user.is_empty() && (role == "admin" || role == "user") && (current_time - timestamp) < 3600 // 1小时内有效
+        !user.is_empty() && (role == "admin" || role == "user") && (current_time - timestamp) < 3600
+    // 1小时内有效
     } else {
         false
     }
@@ -199,14 +209,15 @@ async fn jwt_require_role(required_role: &'static str, ctx: RequestCtx, next: Ne
         }
     }
 
-    ResponseBuilder::forbidden_json(format!(
-        r#"{{"error": "Access denied. Required role: {}"}}"#,
-        required_role
-    ))
+    (
+        ree::StatusCode::FORBIDDEN,
+        json!({"error": format!("Access denied. Required role: {}", required_role)}),
+    )
+        .into_response()
 }
 
 /// 生成简化的JWT token（仅用于演示）
-fn generate_demo_jwt_token(user: &str, role: &str) -> String {
+fn _generate_demo_jwt_token(user: &str, role: &str) -> String {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -223,6 +234,7 @@ async fn request_counter(ctx: RequestCtx, next: Next) -> Response {
 }
 
 /// CORS 中间件构建器
+#[allow(dead_code)]
 struct CorsBuilder {
     allow_origin: String,
     allow_methods: Vec<String>,
@@ -230,6 +242,7 @@ struct CorsBuilder {
 }
 
 impl CorsBuilder {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             allow_origin: "*".to_string(),
@@ -244,27 +257,31 @@ impl CorsBuilder {
         }
     }
 
+    #[allow(dead_code)]
     fn allow_origin(mut self, origin: &str) -> Self {
         self.allow_origin = origin.to_string();
         self
     }
 
+    #[allow(dead_code)]
     fn allow_methods(mut self, methods: &[&str]) -> Self {
         self.allow_methods = methods.iter().map(|s| s.to_string()).collect();
         self
     }
 
+    #[allow(dead_code)]
     fn allow_headers(mut self, headers: &[&str]) -> Self {
         self.allow_headers = headers.iter().map(|s| s.to_string()).collect();
         self
     }
 
+    #[allow(dead_code)]
     fn build(
         self,
     ) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
-    + Send
-    + Sync
-    + 'static {
+           + Send
+           + Sync
+           + 'static {
         let origin = self.allow_origin;
         let methods = self.allow_methods.join(", ");
         let headers = self.allow_headers.join(", ");
@@ -287,21 +304,16 @@ impl CorsBuilder {
     }
 }
 
-/// CORS 中间件
-fn cors() -> CorsBuilder {
-    CorsBuilder::new()
-}
-
 /// 🚀 限流中间件 - 使用简洁的函数式风格
 async fn rate_limit(max_requests: usize, ctx: RequestCtx, next: Next) -> Response {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    
+
     // 使用全局静态计数器（简化实现）
     static GLOBAL_COUNTER: AtomicUsize = AtomicUsize::new(0);
     static LAST_RESET: std::sync::OnceLock<std::sync::Mutex<Instant>> = std::sync::OnceLock::new();
-    
+
     let last_reset = LAST_RESET.get_or_init(|| std::sync::Mutex::new(Instant::now()));
-    
+
     // 每分钟重置计数器
     {
         let mut last_reset = last_reset.lock().unwrap();
@@ -310,13 +322,14 @@ async fn rate_limit(max_requests: usize, ctx: RequestCtx, next: Next) -> Respons
             *last_reset = Instant::now();
         }
     }
-    
+
     let current = GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst);
-    
+
     if current >= max_requests {
-        return ResponseBuilder::too_many_requests_json(
-            format!(r#"{{"error": "Rate limit exceeded", "limit": {}}}"#, max_requests),
-        );
+        return ResponseBuilder::new()
+            .status(ree::StatusCode::TOO_MANY_REQUESTS)
+            .header("Content-Type", "application/json")
+            .body(json!({"error": "Rate limit exceeded", "limit": max_requests}).to_string());
     }
 
     next(ctx).await
@@ -327,18 +340,31 @@ async fn cors_simple(ctx: RequestCtx, next: Next) -> Response {
     let mut response = next(ctx).await;
     let headers = response.headers_mut();
     headers.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-    headers.insert("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap());
-    headers.insert("Access-Control-Allow-Headers", "Content-Type, Authorization".parse().unwrap());
+    headers.insert(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap(),
+    );
+    headers.insert(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization".parse().unwrap(),
+    );
     response
 }
 
 /// 🚀 自定义CORS中间件 - 使用简洁的函数式风格
+#[allow(dead_code)]
 async fn cors_custom(origin: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let mut response = next(ctx).await;
     let headers = response.headers_mut();
     headers.insert("Access-Control-Allow-Origin", origin.parse().unwrap());
-    headers.insert("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap());
-    headers.insert("Access-Control-Allow-Headers", "Content-Type, Authorization".parse().unwrap());
+    headers.insert(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap(),
+    );
+    headers.insert(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization".parse().unwrap(),
+    );
     response
 }
 
@@ -346,9 +372,11 @@ async fn cors_custom(origin: &'static str, ctx: RequestCtx, next: Next) -> Respo
 async fn request_id(ctx: RequestCtx, next: Next) -> Response {
     let request_id = uuid::Uuid::new_v4().to_string();
     println!("🆔 Request ID: {}", request_id);
-    
+
     let mut response = next(ctx).await;
-    response.headers_mut().insert("X-Request-ID", request_id.parse().unwrap());
+    response
+        .headers_mut()
+        .insert("X-Request-ID", request_id.parse().unwrap());
     response
 }
 
@@ -359,42 +387,64 @@ async fn api_key_auth(valid_key: &'static str, ctx: RequestCtx, next: Next) -> R
             return next(ctx).await;
         }
     }
-    
-    ResponseBuilder::unauthorized_json(r#"{"error": "Invalid or missing API key"}"#)
+
+    (
+        ree::StatusCode::UNAUTHORIZED,
+        json!({"error": "Invalid or missing API key"}),
+    )
+        .into_response()
 }
 
 /// 🚀 内容类型验证中间件 - 无参数版本，不需要宏
+#[allow(dead_code)]
 async fn require_json(ctx: RequestCtx, next: Next) -> Response {
     if let Some(content_type) = ctx.request.headers().get("Content-Type") {
-        if content_type.to_str().unwrap_or("").starts_with("application/json") {
+        if content_type
+            .to_str()
+            .unwrap_or("")
+            .starts_with("application/json")
+        {
             return next(ctx).await;
         }
     }
-    
-    ResponseBuilder::bad_request_json(r#"{"error": "Content-Type must be application/json"}"#)
+
+    (
+        ree::StatusCode::BAD_REQUEST,
+        json!({"error": "Content-Type must be application/json"}),
+    )
+        .into_response()
 }
 
 /// 🚀 限流中间件构建器 - 更优雅的解决方案
+#[allow(dead_code)]
 struct RateLimitBuilder {
     max_requests: usize,
     window_seconds: u64,
 }
 
 impl RateLimitBuilder {
+    #[allow(dead_code)]
     fn new(max_requests: usize) -> Self {
         Self {
             max_requests,
             window_seconds: 60, // 默认1分钟
         }
     }
-    
+
+    #[allow(dead_code)]
     fn window_seconds(mut self, seconds: u64) -> Self {
         self.window_seconds = seconds;
         self
     }
-    
+
     /// 构建一个可以直接使用的async函数
-    fn build_async(self) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
+    #[allow(dead_code)]
+    fn build_async(
+        self,
+    ) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+           + Send
+           + Sync
+           + 'static {
         let requests_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let last_reset = Arc::new(std::sync::Mutex::new(Instant::now()));
         let max_requests = self.max_requests;
@@ -415,9 +465,15 @@ impl RateLimitBuilder {
 
                 let current = requests_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if current >= max_requests {
-                    return ResponseBuilder::too_many_requests_json(
-                        format!(r#"{{"error": "Rate limit exceeded", "limit": {}, "window": "{}s"}}"#, max_requests, window_seconds),
-                    );
+                    (
+                        ree::StatusCode::TOO_MANY_REQUESTS,
+                        json!({
+                            "error": "Rate limit exceeded",
+                            "limit": max_requests,
+                            "window": format!("{} seconds", window_seconds)
+                        }),
+                    )
+                        .into_response();
                 }
 
                 next(ctx).await
@@ -427,62 +483,52 @@ impl RateLimitBuilder {
 }
 
 /// 🚀 创建限流中间件的便捷函数
+#[allow(dead_code)]
 fn create_rate_limit(max_requests: usize) -> RateLimitBuilder {
     RateLimitBuilder::new(max_requests)
 }
 
 /// 🚀 错误处理中间件
+#[allow(dead_code)]
 async fn error_handler(ctx: RequestCtx, next: Next) -> Response {
     // 尝试执行下一个处理器，并捕获可能的错误
     let response = next(ctx).await;
-    
+
     // 检查状态码是否为错误
     if response.status().is_server_error() {
         println!("服务器错误: {}", response.status());
-        
+
         // 这里可以记录错误，发送告警等
-        
+
         // 在生产环境中，你可能想要用更友好的错误消息替换原始错误
         // 这里只是简单地返回原始响应
     } else if response.status().is_client_error() {
         println!("客户端错误: {}", response.status());
-        
+
         // 可以记录客户端错误以分析API使用问题
     }
-    
+
     response
 }
 
 /// 🌐 CORS中间件
+#[allow(dead_code)]
 async fn cors(ctx: RequestCtx, next: Next) -> Response {
     let response = next(ctx).await;
-    
+
     // 添加CORS头
-    let builder = hyper::Response::builder()
+    ResponseBuilder::new()
         .status(response.status())
         .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    
-    // 如果是OPTIONS请求，直接返回
-    if ctx.request.method() == hyper::Method::OPTIONS {
-        return builder
-            .header("Access-Control-Max-Age", "86400")
-            .body(response.into_body())
-            .unwrap();
-    }
-    
-    // 复制所有原始的响应头
-    let mut new_response = builder.body(response.into_body()).unwrap();
-    for (key, value) in response.headers() {
-        if key != "access-control-allow-origin" && 
-           key != "access-control-allow-methods" && 
-           key != "access-control-allow-headers" {
-            new_response.headers_mut().insert(key.clone(), value.clone());
-        }
-    }
-    
-    new_response
+        .header(
+            "Access-Control-Allow-Methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        )
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
+        .empty_body()
 }
 
 // =============================================================================
@@ -542,7 +588,11 @@ async fn cors(ctx: RequestCtx, next: Next) -> Response {
 
 /// 增强版可配置限流中间件
 /// 这个函数允许自定义窗口时间周期
-pub fn advanced_rate_limit(max_requests: usize, window_seconds: u64) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static {
+pub fn advanced_rate_limit(
+    max_requests: usize,
+    window_seconds: u64,
+) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync + 'static
+{
     // 使用静态计数器和上次重置时间
     let requests_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let last_reset = Arc::new(std::sync::Mutex::new(Instant::now()));
@@ -550,7 +600,7 @@ pub fn advanced_rate_limit(max_requests: usize, window_seconds: u64) -> impl Fn(
     move |ctx, next| {
         let requests_count = requests_count.clone();
         let last_reset = last_reset.clone();
-        
+
         Box::pin(async move {
             // 检查是否需要重置计数器
             {
@@ -564,9 +614,15 @@ pub fn advanced_rate_limit(max_requests: usize, window_seconds: u64) -> impl Fn(
             // 增加计数并检查限制
             let current = requests_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if current >= max_requests {
-                return ResponseBuilder::too_many_requests_json(
-                    format!(r#"{{"error": "Rate limit exceeded", "limit": {}, "window": "{}s"}}"#, max_requests, window_seconds),
-                );
+                (
+                    ree::StatusCode::TOO_MANY_REQUESTS,
+                    json!({
+                        "error": "Rate limit exceeded",
+                        "limit": max_requests,
+                        "window": format!("{} seconds", window_seconds)
+                    }),
+                )
+                    .into_response();
             }
 
             next(ctx).await
@@ -661,7 +717,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 使用函数式中间件写法，更加简洁直观
         jwt_group.use_middleware(|ctx, next| jwt_auth("my-secret-key", ctx, next));
-        
+
         // JWT路由
         jwt_group.get("/profile", |_ctx: RequestCtx| async move {
             json!({
@@ -715,15 +771,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("7️⃣ Advanced rate limiter with configurable window");
     {
         let limiter_group = app.group("/limiter");
-        
+
         // 使用高级限流中间件 - 配置10秒窗口，最多5个请求
         limiter_group.use_middleware(advanced_rate_limit(5, 10));
-        
+
         // 限流测试路由
         limiter_group.get("/test", |_ctx: RequestCtx| async move {
             // 模拟处理时间
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            
+
             json!({
                 "message": "限流测试成功",
                 "limit": "5个请求/10秒",
@@ -731,7 +787,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
         });
     }
-    
+
     // 添加最终的日志中间件演示
     app.get("/demo/logging", |_ctx: RequestCtx| async move {
         json!({
@@ -739,10 +795,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "timestamp": "2025-06-16T12:00:00Z"
         })
     });
-    
+
     // 使用自定义日志中间件
     app.use_middleware(|ctx, next| logging("全局日志中间件", ctx, next));
-    
+
     println!("\n🚀 Server starting...");
     println!("📍 Address: http://127.0.0.1:3000");
     println!("\n📋 测试路由:");
@@ -753,14 +809,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  GET  /admin/users         - 需要admin角色权限");
     println!("  GET  /limiter/test        - 限流测试 (5次/10秒)");
     println!("  GET  /demo/logging        - 日志中间件演示");
-    
+
     println!("\n💡 测试日志中间件:");
     println!("  curl http://127.0.0.1:3000/demo/logging");
     println!("\n💡 测试认证API:");
     println!("  curl -H 'Authorization: Bearer secret-token' http://127.0.0.1:3000/api/users");
     println!("\n💡 测试限流:");
     println!("  快速多次执行: curl http://127.0.0.1:3000/limiter/test");
-    
+
     println!("\n🔥 新的函数式中间件让开发更简洁高效！");
 
     app.run("127.0.0.1:3000").await?;
@@ -772,96 +828,89 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 // =============================================================================
 
 /// 首页处理器
+#[allow(dead_code)]
 async fn index(_ctx: RequestCtx) -> Response {
-    ResponseBuilder::new()
-        .status(hyper::StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .json(json!({
-            "message": "欢迎使用REE框架",
-            "version": "1.0.0",
-            "description": "一个简单、高效的Rust Web框架"
-        }))
+    json!({
+        "message": "欢迎使用REE框架",
+        "version": "1.0.0",
+        "description": "一个简单、高效的Rust Web框架"
+    })
+    .into_response()
 }
 
 /// 用户信息处理器
+#[allow(dead_code)]
 async fn user_info(ctx: RequestCtx) -> Response {
     // 获取URL参数
     if let Some(user_id) = ctx.get_param("id") {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .header("Content-Type", "application/json")
-            .json(json!({
-                "id": user_id,
-                "name": "测试用户",
+        json!({
+            "id": user_id,
+            "name": "测试用户",
                 "email": "test@example.com",
                 "created_at": "2025-01-01T00:00:00Z"
-            }))
+        })
+        .into_response()
     } else {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::BAD_REQUEST)
-            .header("Content-Type", "application/json")
-            .json(json!({
-                "error": "缺少用户ID"
-            }))
+        json!({
+            "error": "缺少用户ID"
+        })
+        .into_response()
     }
 }
 
 /// 模拟API处理器
+#[allow(dead_code)]
 async fn api_handler(_ctx: RequestCtx) -> Response {
     // 故意延迟一点来测试计时器中间件
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-    
-    ResponseBuilder::new()
-        .status(hyper::StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .json(json!({
-            "data": {
-                "items": [
-                    { "id": 1, "name": "项目1" },
-                    { "id": 2, "name": "项目2" },
-                    { "id": 3, "name": "项目3" }
-                ],
-                "total": 3
-            }
-        }))
+
+    json!({
+        "data": {
+            "items": [
+                { "id": 1, "name": "项目1" },
+                { "id": 2, "name": "项目2" },
+                { "id": 3, "name": "项目3" }
+            ],
+            "total": 3
+        }
+    })
+    .into_response()
 }
 
 /// 受保护的API处理器
+#[allow(dead_code)]
 async fn protected_api(_ctx: RequestCtx) -> Response {
-    ResponseBuilder::new()
-        .status(hyper::StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .json(json!({
-            "message": "认证成功，你已访问受保护的资源",
-            "data": {
-                "sensitive": true,
-                "value": "这是一个需要认证才能访问的秘密数据",
-                "timestamp": "2025-06-16T10:00:00Z"
-            }
-        }))
+    json!({
+        "message": "认证成功，你已访问受保护的资源",
+        "data": {
+            "sensitive": true,
+            "value": "这是一个需要认证才能访问的秘密数据",
+            "timestamp": "2025-06-16T10:00:00Z"
+        }
+    })
+    .into_response()
 }
 
 /// 模拟错误处理器
+#[allow(dead_code)]
 async fn error_demo(_ctx: RequestCtx) -> Response {
-    ResponseBuilder::new()
-        .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-        .header("Content-Type", "application/json")
-        .json(json!({
-            "error": "这是一个模拟的服务器错误",
-            "code": "SERVER_ERROR_DEMO"
-        }))
+    json!({
+        "error": "这是一个模拟的服务器错误",
+        "code": "SERVER_ERROR_DEMO"
+    })
+    .into_response()
 }
 
 /// 日志中间件的辅助函数 - 使用函数式风格
 async fn logging(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
     let start = Instant::now();
-    let path = ctx.request.uri().path();
-    let method = ctx.request.method();
-    
+    let path = ctx.request.uri().path().to_string();
+    let method = ctx.request.method().clone();
+
     println!("[{}] 📝 处理请求: {} {}", prefix, method, path);
-    
+
     let response = next(ctx).await;
-    
+
     let status = response.status();
     let status_str = if status.is_success() {
         format!("✅ {}", status)
@@ -872,15 +921,15 @@ async fn logging(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response 
     } else {
         format!("ℹ️ {}", status)
     };
-    
+
     println!(
-        "[{}] 🏁 请求完成: {} {} {} ({}ms)", 
-        prefix, 
-        method, 
-        path, 
-        status_str, 
+        "[{}] 🏁 请求完成: {} {} {} ({}ms)",
+        prefix,
+        method,
+        path,
+        status_str,
         start.elapsed().as_millis()
     );
-    
+
     response
 }

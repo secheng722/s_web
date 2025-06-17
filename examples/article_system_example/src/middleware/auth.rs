@@ -36,7 +36,7 @@ pub async fn logging_middleware(
 
 // 认证中间件
 pub async fn auth_middleware(state: Arc<AppState>, ctx: RequestCtx, next: Next) -> Response {
-    if ctx.request.method() == "GET" {
+    if ctx.request.method() == "GET" && ctx.request.uri().path() == "/api/articles" {
         // 如果是 GET 请求，直接放行
         return next(ctx).await;
     }

@@ -5,7 +5,7 @@ mod middleware;
 mod models;
 mod routes;
 
-use ree::{Engine, ResponseBuilder};
+use ree::Engine;
 
 use crate::middleware::logging_middleware;
 

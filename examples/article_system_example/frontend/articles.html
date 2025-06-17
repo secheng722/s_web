@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章列表 - 博客系统</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="logo"><a href="/">博客系统</a></h1>
+                <div class="nav-links">
+                    <a href="/">首页</a>
+                    <a href="/articles">文章</a>
+                    <a href="/login" id="auth-link">登录</a>
+                    <a href="#" id="logout-link" style="display: none;">退出</a>
+                    <a href="/create-article" id="create-link" style="display: none;" class="btn btn-small">写文章</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="articles-header">
+                <h2>所有文章</h2>
+                <div class="articles-actions">
+                    <button id="refresh-btn" class="btn btn-secondary">刷新</button>
+                </div>
+            </div>
+            
+            <div id="articles-loading" class="loading">加载中...</div>
+            <div id="articles-container" class="articles-grid"></div>
+            <div id="articles-error" class="error-message" style="display: none;"></div>
+        </div>
+    </main>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/articles.js"></script>
+</body>
+</html>

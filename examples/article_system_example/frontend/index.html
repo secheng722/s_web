@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博客系统 - 首页</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="logo">博客系统</h1>
+                <div class="nav-links">
+                    <a href="/">首页</a>
+                    <a href="/articles">文章</a>
+                    <a href="/login" id="auth-link">登录</a>
+                    <a href="#" id="logout-link" style="display: none;">退出</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h2>欢迎来到现代化博客系统</h2>
+                <p>基于 Rust + ree 框架构建的高性能博客平台</p>
+                <div class="hero-buttons">
+                    <a href="/articles" class="btn btn-primary">浏览文章</a>
+                    <a href="/login" class="btn btn-secondary">开始写作</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h3>系统特色</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>高性能</h4>
+                        <p>基于 Rust 构建，提供卓越的性能和安全性</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>现代化 UI</h4>
+                        <p>响应式设计，支持各种设备访问</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>用户认证</h4>
+                        <p>JWT 认证系统，保护用户数据安全</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>文章管理</h4>
+                        <p>完整的文章增删改查功能</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 博客系统. 基于 Rust + ree 框架构建</p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

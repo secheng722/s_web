@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2024"
 description = "A simple HTTP framework for Rust"
 license = "MIT"
+exclude = [
+    "examples/*",
+    "target/*",
+    ".git/*",
+    ".gitmodules"
+]
 
 [dependencies]
 hyper = { version = "1.6.0", features = ["full"] }

@@ -17,7 +17,7 @@ REE  is a lightweight, high-performance HTTP framework for Rust, inspired by Exp
 - **JSON**: Seamless JSON serialization/deserialization
 - **Static Files**: Easily serve static files
 - **WebSockets**: WebSocket support via Tokio Tungstenite
-- **Graceful shutdown**: Handle shutdown signals gracefully
+- **Graceful Shutdown**: Professional graceful shutdown handling with CTRL+C signal support
 - **Modular Design**: Build only what you need
 
 ## Quick Example

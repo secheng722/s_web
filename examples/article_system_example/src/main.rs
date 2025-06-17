@@ -26,16 +26,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 注册全局中间件
     app.use_middleware(|ctx, next| logging_middleware("BlogAPI", ctx, next));
 
-    app.use_middleware(|ctx, next| {
-        async move {
-            let mut response = next(ctx).await;
-            // 如果是500错误，返回通用错误消息
-            if response.status() == 500 {
-                response = ResponseBuilder::internal_error();
-            }
-            response
-        }
-    });
     // 注册所有路由
     routes::register_all_routes(&mut app, state);
 

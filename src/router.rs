@@ -87,7 +87,8 @@ impl Router {
             return ResponseBuilder::not_found();
         }
         
-        ctx.params = params;
+        // Merge routing parameters and middleware parameters instead of overwriting
+        ctx.params.extend(params);
         let node = node.unwrap();
         let key = format!("{}-{}", method, node.pattern);
         

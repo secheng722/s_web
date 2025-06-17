@@ -26,6 +26,21 @@ impl RequestCtx {
         self.params.get(key)
     }
 
+    /// Add a parameter to the context
+    pub fn add_param(&mut self, key: String, value: String) {
+        self.params.insert(key, value);
+    }
+
+    /// Add multiple parameters to the context
+    pub fn add_params(&mut self, params: std::collections::HashMap<String, String>) {
+        self.params.extend(params);
+    }
+
+    /// Check if a parameter exists
+    pub fn has_param(&self, key: &str) -> bool {
+        self.params.contains_key(key)
+    }
+
     /// Get the request body as bytes
     pub fn body_bytes(&self) -> Option<&Bytes> {
         self.body.as_ref()

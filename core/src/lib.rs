@@ -15,8 +15,7 @@ mod trie;
 // =============================================================================
 
 // These are used internally by the framework
-use handler::Handler;
-use middleware::{Middleware, execute_chain};
+use middleware::{execute_chain, Middleware};
 use router::Router;
 // =============================================================================
 // Public API Exports
@@ -26,11 +25,14 @@ pub use context::RequestCtx;
 /// Core framework components
 pub use engine::Engine;
 
+/// Handler trait for request processing
+pub use handler::Handler;
+
 /// Response handling
 pub use response::{IntoResponse, Response, ResponseBuilder};
 
 /// Middleware system
-pub use middleware::Next;
+pub use middleware::{IntoNext, Next};
 
 // =============================================================================
 // Advanced/Internal API Exports

@@ -48,7 +48,7 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 name = "api_guide"
 version = "0.1.0"
 dependencies = [
- "ree 0.1.0",
+ "ree",
  "serde_json",
  "tokio",
 ]
@@ -286,7 +286,7 @@ name = "database_example"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "ree 0.1.0",
+ "ree",
  "serde",
  "serde_json",
  "sqlx",
@@ -948,7 +948,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "ree 0.1.0",
+ "ree",
  "serde",
  "serde_json",
  "tokio",
@@ -1247,20 +1247,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ree"
-version = "0.1.0"
-source = "git+https://github.com/secheng722/ree#6f55ef5ddad6d860d85d62c873176c6c57d5ed70"
-dependencies = [
- "async-trait",
- "http-body-util",
- "hyper",
- "hyper-util",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "ree_test"
 version = "0.1.0"
 dependencies = [
@@ -1268,7 +1254,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "jsonwebtoken",
- "ree 0.1.0 (git+https://github.com/secheng722/ree)",
+ "ree",
  "serde",
  "serde_json",
  "sqlx",

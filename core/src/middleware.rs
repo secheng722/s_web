@@ -12,6 +12,24 @@ pub type Middleware = Arc<dyn Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output 
 /// The next handler in the middleware chain
 pub type Next = Arc<dyn Fn(RequestCtx) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
+/// Trait for converting types into Next
+pub trait IntoNext {
+    fn into_next(self) -> Next;
+}
+
+/// Implement IntoNext for async functions that return Response
+impl<F, Fut> IntoNext for F
+where
+    F: Fn(RequestCtx) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Response> + Send + 'static,
+{
+    fn into_next(self) -> Next {
+        Arc::new(move |ctx| {
+            Box::pin((self)(ctx))
+        })
+    }
+}
+
 /// Execute a chain of middlewares
 pub async fn execute_chain(middlewares: &[Middleware], endpoint: Next, ctx: RequestCtx) -> Response {
     if middlewares.is_empty() {

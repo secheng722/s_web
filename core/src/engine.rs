@@ -8,7 +8,7 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 
 use crate::{
-    execute_chain, response::IntoResponse, Handler, Middleware, Next, RequestCtx, Response, Router,
+    execute_chain, response::IntoResponse, Handler, Middleware, Next, RequestCtx, Response, Router, middleware::IntoNext,
 };
 
 /// A group of routes with shared prefix and middleware
@@ -209,10 +209,10 @@ impl Engine {
                                         combined_middlewares.extend(global_middlewares.iter().cloned());
                                         combined_middlewares.extend(group.middlewares.iter().cloned());
 
-                                        let endpoint: Next = Arc::new(move |ctx| {
+                                        let endpoint = (move |ctx| {
                                             let group = group.clone();
-                                            Box::pin(async move { group.handle_request(ctx).await })
-                                        });
+                                            async move { group.handle_request(ctx).await }
+                                        }).into_next();
 
                                         execute_chain(&combined_middlewares, endpoint, ctx).await
                                     }
@@ -223,10 +223,10 @@ impl Engine {
                                         router.handle_request(ctx).await
                                     } else {
                                         // Middleware path
-                                        let endpoint: Next = Arc::new(move |ctx| {
+                                        let endpoint = (move |ctx| {
                                             let router = router.clone();
-                                            Box::pin(async move { router.handle_request(ctx).await })
-                                        });
+                                            async move { router.handle_request(ctx).await }
+                                        }).into_next();
 
                                         execute_chain(&global_middlewares, endpoint, ctx).await
                                     }

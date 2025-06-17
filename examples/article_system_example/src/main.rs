@@ -32,7 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 添加错误处理
 
     // 启动应用
-    println!("Starting server at http://127.0.0.1:3000");
     app.run("127.0.0.1:3000").await?;
 
     Ok(())

@@ -1,6 +1,6 @@
 # REE
 
-REE is a lightweight, high-performance HTTP framework for Rust, inspired by Express, Echo, and Koa. It integrates Hyper into a familiar API with a focus on simplicity, flexibility, and performance.
+REE  is a lightweight, high-performance HTTP framework for Rust, inspired by Express, Echo, and Koa. It integrates Hyper into a familiar API with a focus on simplicity, flexibility, and performance.
 
 [![Crates.io](https://img.shields.io/crates/v/ree.svg)](https://crates.io/crates/ree)
 [![Documentation](https://docs.rs/ree/badge.svg)](https://docs.rs/ree)

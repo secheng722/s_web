@@ -6,6 +6,7 @@ members = [
     "examples/database_example",
     "examples/article_system_example",
     "examples/chain_example",
+    "examples/custom_response_example",
 ]
 resolver = "2"
 

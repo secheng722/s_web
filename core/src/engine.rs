@@ -35,27 +35,31 @@ impl RouterGroup {
     }
 
     /// Add a GET route to this group
-    pub fn get(&mut self, path: &str, handler: impl Handler) {
+    pub fn get(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("GET", path, handler);
+        self
     }
 
     /// Add a POST route to this group
-    pub fn post(&mut self, path: &str, handler: impl Handler) {
+    pub fn post(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("POST", path, handler);
+        self
     }
 
     /// Add a PUT route to this group
-    pub fn put(&mut self, path: &str, handler: impl Handler) {
+    pub fn put(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("PUT", path, handler);
+        self
     }
 
     /// Add a DELETE route to this group
-    pub fn delete(&mut self, path: &str, handler: impl Handler) {
+    pub fn delete(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("DELETE", path, handler);
+        self
     }
 
     /// Add middleware to this group
-    pub fn use_middleware<F, Fut>(&mut self, middleware: F)
+    pub fn use_middleware<F, Fut>(&mut self, middleware: F) -> &mut Self
     where
         F: Fn(RequestCtx, Next) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
@@ -65,6 +69,7 @@ impl RouterGroup {
             Box::pin(fut) as Pin<Box<dyn Future<Output = Response> + Send>>
         };
         self.middlewares.push(Arc::new(wrapped));
+        self
     }
 
     /// Handle a request using this group's router
@@ -92,7 +97,7 @@ impl Engine {
     }
 
     /// Add global middleware
-    pub fn use_middleware<F, Fut>(&mut self, middleware: F)
+    pub fn use_middleware<F, Fut>(&mut self, middleware: F) -> &mut Self
     where
         F: Fn(RequestCtx, Next) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
@@ -102,6 +107,7 @@ impl Engine {
             Box::pin(fut) as Pin<Box<dyn Future<Output = Response> + Send>>
         };
         self.middlewares.push(Arc::new(wrapped));
+        self
     }
 
     /// Create a route group with the given prefix
@@ -118,23 +124,27 @@ impl Engine {
     }
 
     /// Add a GET route
-    pub fn get(&mut self, path: &str, handler: impl Handler) {
+    pub fn get(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("GET", path, handler);
+        self
     }
 
     /// Add a POST route
-    pub fn post(&mut self, path: &str, handler: impl Handler) {
+    pub fn post(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("POST", path, handler);
+        self
     }
 
     /// Add a PUT route
-    pub fn put(&mut self, path: &str, handler: impl Handler) {
+    pub fn put(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("PUT", path, handler);
+        self
     }
 
     /// Add a DELETE route
-    pub fn delete(&mut self, path: &str, handler: impl Handler) {
+    pub fn delete(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("DELETE", path, handler);
+        self
     }
 
     /// Start the HTTP server

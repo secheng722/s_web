@@ -1,3 +1,5 @@
+//! Context for handling HTTP requests in a web application.
+
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
 
@@ -14,11 +16,15 @@ impl RequestCtx {
     pub async fn new(request: HayperRequest) -> Result<Self, hyper::Error> {
         let (parts, body) = request.into_parts();
         let body_bytes = body.collect().await?.to_bytes();
-        
+
         Ok(RequestCtx {
             request: hyper::Request::from_parts(parts, ()),
             params: std::collections::HashMap::new(),
-            body: if body_bytes.is_empty() { None } else { Some(body_bytes) },
+            body: if body_bytes.is_empty() {
+                None
+            } else {
+                Some(body_bytes)
+            },
         })
     }
 

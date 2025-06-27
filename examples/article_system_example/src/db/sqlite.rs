@@ -4,7 +4,7 @@ pub async fn init_db() -> Result<Pool<Sqlite>, sqlx::Error> {
     // 确保 data 目录存在
     std::fs::create_dir_all("data").ok();
     
-    let database_url = "sqlite:data/app.db";
+    let database_url = "sqlite:examples/article_system_example/data/app.db";
     
     // 创建数据库连接
     let pool = SqlitePool::connect(database_url).await?;

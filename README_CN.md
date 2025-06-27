@@ -48,39 +48,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
     
     // 使用路径参数
-    app.get("/hello/:name", handler(|ctx| async move {
+    app.get("/hello/:name", |ctx| async move {
         if let Some(name) = ctx.get_param("name") {
             format!("Hello, {}!", name)
         } else {
             "Hello, Anonymous!".to_string()
         }
-    }))
+    });
     
     // 返回 Result - 自动处理错误
-    app.get("/result", handler(|_| async {
+    app.get("/result", |_| async {
         let result: Result<&str, &str> = Ok("Success!");
         result  // Ok -> 200, Err -> 500
-    }));
+    });
     
     // 返回 Option - 自动处理 None
-    app.get("/option", handler(|_| async {
+    app.get("/option", |_| async {
         let data: Option<&str> = Some("Found!");
         data  // Some -> 200, None -> 404
-    }));
+    });
     
     // 自定义状态码
-    app.get("/created", handler(|_| async {
+    app.get("/created", |_| async {
         (ree::StatusCode::CREATED, "Resource created")
-    }));
+    });
 
     // 链式调用
     // 因为中间件和路由都支持链式调用，可以更灵活地组织代码
     // 系统会自己处理中间件的执行顺序
-    app.get("/chained", handler(|_| async {
+    app.get("/chained", |_| async {
         "This is a chained response"
-    })).get("/another", handler(|_| async {
+    }).get("/another", |_| async {
         "Another chained response"
-    })).use_middleware(|ctx, next| async move {
+    }).use_middleware(|ctx, next| async move {
         println!("Middleware executed");
         next(ctx).await
     });

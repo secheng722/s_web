@@ -46,7 +46,7 @@ async fn _access_log(prefix: &'static str, ctx: RequestCtx, next: Next) -> Respo
     let method = ctx.request.method().to_string();
     let path = ctx.request.uri().path().to_string();
 
-    println!("[{}] 开始处理请求: {} {}", prefix, method, path);
+    println!("[{prefix}] 开始处理请求: {method} {path}");
 
     let response = next(ctx).await;
 
@@ -110,7 +110,7 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
     };
 
     // 检查令牌是否有效
-    if auth_str != format!("Bearer {}", token_value) {
+    if auth_str != format!("Bearer {token_value}") {
         return ResponseBuilder::new()
             .status(ree::StatusCode::FORBIDDEN)
             .header("Content-Type", "application/json")
@@ -130,18 +130,17 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
 /// 🚀 JWT 认证中间件 - 使用简洁的函数式风格
 async fn jwt_auth(secret: &'static str, ctx: RequestCtx, next: Next) -> Response {
     // 从 Authorization header 获取 JWT token
-    if let Some(auth_header) = ctx.request.headers().get("Authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                // 简化的JWT验证逻辑（实际项目中应使用专业的JWT库如jsonwebtoken）
-                if validate_jwt_token(token, secret) {
-                    println!(
-                        "✅ JWT authentication successful: {}",
-                        extract_user_from_token(token)
-                    );
-                    return next(ctx).await;
-                }
-            }
+    if let Some(auth_header) = ctx.request.headers().get("Authorization")
+        && let Ok(auth_str) = auth_header.to_str()
+        && let Some(token) = auth_str.strip_prefix("Bearer ")
+    {
+        // 简化的JWT验证逻辑（实际项目中应使用专业的JWT库如jsonwebtoken）
+        if validate_jwt_token(token, secret) {
+            println!(
+                "✅ JWT authentication successful: {}",
+                extract_user_from_token(token)
+            );
+            return next(ctx).await;
         }
     }
 
@@ -222,7 +221,7 @@ fn _generate_demo_jwt_token(user: &str, role: &str) -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    format!("{}.{}.{}", user, role, timestamp)
+    format!("{user}.{role}.{timestamp}")
 }
 
 /// 🚀 请求计数器中间件
@@ -279,9 +278,9 @@ impl CorsBuilder {
     fn build(
         self,
     ) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
-           + Send
-           + Sync
-           + 'static {
+    + Send
+    + Sync
+    + 'static {
         let origin = self.allow_origin;
         let methods = self.allow_methods.join(", ");
         let headers = self.allow_headers.join(", ");
@@ -371,7 +370,7 @@ async fn cors_custom(origin: &'static str, ctx: RequestCtx, next: Next) -> Respo
 /// 🚀 请求ID中间件 - 无参数版本，不需要宏
 async fn request_id(ctx: RequestCtx, next: Next) -> Response {
     let request_id = uuid::Uuid::new_v4().to_string();
-    println!("🆔 Request ID: {}", request_id);
+    println!("🆔 Request ID: {request_id}");
 
     let mut response = next(ctx).await;
     response
@@ -442,9 +441,9 @@ impl RateLimitBuilder {
     fn build_async(
         self,
     ) -> impl Fn(RequestCtx, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
-           + Send
-           + Sync
-           + 'static {
+    + Send
+    + Sync
+    + 'static {
         let requests_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let last_reset = Arc::new(std::sync::Mutex::new(Instant::now()));
         let max_requests = self.max_requests;
@@ -907,19 +906,19 @@ async fn logging(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response 
     let path = ctx.request.uri().path().to_string();
     let method = ctx.request.method().clone();
 
-    println!("[{}] 📝 处理请求: {} {}", prefix, method, path);
+    println!("[{prefix}] 📝 处理请求: {method} {path}");
 
     let response = next(ctx).await;
 
     let status = response.status();
     let status_str = if status.is_success() {
-        format!("✅ {}", status)
+        format!("✅ {status}")
     } else if status.is_client_error() {
-        format!("⚠️ {}", status)
+        format!("⚠️ {status}")
     } else if status.is_server_error() {
-        format!("❌ {}", status)
+        format!("❌ {status}")
     } else {
-        format!("ℹ️ {}", status)
+        format!("ℹ️ {status}")
     };
 
     println!(

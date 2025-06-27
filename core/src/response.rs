@@ -199,7 +199,7 @@ where
             Err(err) => ResponseBuilder::new()
                 .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
                 .content_type("text/plain; charset=utf-8")
-                .body(format!("Error: {}", err)),
+                .body(format!("Error: {err}")),
         }
     }
 }
@@ -231,5 +231,14 @@ where
 impl IntoResponse for Response {
     fn into_response(self) -> Response {
         self
+    }
+}
+
+impl<const N: usize> IntoResponse for [u8; N] {
+    fn into_response(self) -> Response {
+        ResponseBuilder::new()
+            .status(hyper::StatusCode::OK)
+            .content_type("application/octet-stream")
+            .body(self.to_vec())
     }
 }

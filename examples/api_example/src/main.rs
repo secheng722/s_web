@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 路径参数
     app.get("/simple/greet/:name", |ctx: ree::RequestCtx| async move {
         let name = ctx.get_param("name").map_or("Guest", |v| v);
-        format!("Hello, {}! 👋", name)
+        format!("Hello, {name}! 👋")
     });
 
     // Result处理 - 自动转换错误
@@ -158,18 +158,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // JSON body parsing
     app.post("/post/json", |ctx: ree::RequestCtx| async move {
         match ctx.body_json::<serde_json::Value>() {
-            Ok(Some(json)) => format!("Received JSON: {}", json),
+            Ok(Some(json)) => format!("Received JSON: {json}"),
             Ok(None) => "No body provided".to_string(),
-            Err(e) => format!("Failed to parse JSON: {}", e),
+            Err(e) => format!("Failed to parse JSON: {e}"),
         }
     });
 
     // Text body reading
     app.post("/post/text", |ctx: ree::RequestCtx| async move {
         match ctx.body_string() {
-            Ok(Some(text)) => format!("Received text: {}", text),
+            Ok(Some(text)) => format!("Received text: {text}"),
             Ok(None) => "No body provided".to_string(),
-            Err(e) => format!("Failed to read text: {}", e),
+            Err(e) => format!("Failed to read text: {e}"),
         }
     });
 
@@ -194,10 +194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                     .collect();
 
-                format!("Form data: {:?}", params)
+                format!("Form data: {params:?}")
             }
             Ok(None) => "No form data provided".to_string(),
-            Err(e) => format!("Failed to read form: {}", e),
+            Err(e) => format!("Failed to read form: {e}"),
         }
     });
 

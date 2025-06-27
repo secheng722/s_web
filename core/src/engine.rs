@@ -8,7 +8,8 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 
 use crate::{
-    execute_chain, response::IntoResponse, Handler, Middleware, Next, RequestCtx, Response, Router, middleware::IntoNext,
+    Handler, Middleware, Next, RequestCtx, Response, Router, execute_chain, middleware::IntoNext,
+    response::IntoResponse,
 };
 
 /// A group of routes with shared prefix and middleware
@@ -171,7 +172,7 @@ impl Engine {
         // hyper graceful shutdown
         let graceful = GracefulShutdown::new();
 
-        println!("🚀 Server running on http://{}", addr);
+        println!("🚀 Server running on http://{addr}");
 
         loop {
             tokio::select! {
@@ -196,12 +197,9 @@ impl Engine {
                                     .find(|(prefix, _)| path.starts_with(prefix))
                                     .map(|(_, group)| group.clone());
 
-                                let ctx = match RequestCtx::new(req).await {
-                                    Ok(ctx) => ctx,
-                                    Err(e) => {
-                                        eprintln!("Request context error: {:?}", e);
-                                        return Ok("Bad Request".into_response());
-                                    }
+                                let Ok(ctx) = RequestCtx::new(req).await else {
+                                    eprintln!("Request context error");
+                                    return Ok("Bad Request".into_response());
                                 };
 
                                 let response = if let Some(group) = matched_group {
@@ -250,7 +248,7 @@ impl Engine {
                             .serve_connection(io, service)
                             .await
                         {
-                            eprintln!("Connection error {}: {:?}", remote_addr, err);
+                            eprintln!("Connection error {remote_addr}: {err:?}");
                         }
                     });
                 }

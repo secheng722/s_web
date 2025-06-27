@@ -24,7 +24,7 @@ pub async fn register(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Err(e) => {
             return ResponseBuilder::new()
                 .status(StatusCode::BAD_REQUEST)
-                .body(format!("Invalid request body: {}", e));
+                .body(format!("Invalid request body: {e}"));
         }
     };
 
@@ -97,7 +97,7 @@ pub async fn register(state: Arc<AppState>, ctx: RequestCtx) -> Response {
             } else {
                 ResponseBuilder::new()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Database error: {}", e))
+                    .body(format!("Database error: {e}"))
             }
         }
     }
@@ -111,7 +111,7 @@ pub async fn login(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Err(e) => {
             return ResponseBuilder::new()
                 .status(StatusCode::BAD_REQUEST)
-                .body(format!("Invalid request body: {}", e));
+                .body(format!("Invalid request body: {e}"));
         }
     };
 
@@ -133,7 +133,7 @@ pub async fn login(state: Arc<AppState>, ctx: RequestCtx) -> Response {
                 .body("Invalid credentials");
         }
         Err(e) => {
-            println!("Database error: {}", e);
+            println!("Database error: {e}");
             return ResponseBuilder::new()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body("Database error");
@@ -217,6 +217,6 @@ pub async fn me(state: Arc<AppState>, ctx: RequestCtx) -> Response {
             .body("User not found"),
         Err(e) => ResponseBuilder::new()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Database error: {}", e)),
+            .body(format!("Database error: {e}")),
     }
 }

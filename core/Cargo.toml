@@ -1,7 +1,7 @@
 [package]
 name = "ree"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "A simple HTTP framework for Rust"
 license = "MIT"
 authors = ["826216325@qq.com"]

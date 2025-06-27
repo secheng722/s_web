@@ -145,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn init_database() -> Result<SqlitePool, sqlx::Error> {
     // 获取当前工作目录并构建数据库路径
     let current_dir = std::env::current_dir()
-        .map_err(|e| sqlx::Error::Configuration(format!("无法获取当前目录: {}", e).into()))?;
+        .map_err(|e| sqlx::Error::Configuration(format!("无法获取当前目录: {e}").into()))?;
 
     let db_path = current_dir.join("database.db");
 
@@ -157,13 +157,13 @@ async fn init_database() -> Result<SqlitePool, sqlx::Error> {
     // 确保数据库文件的父目录存在
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库目录: {}", e).into()))?;
+            .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库目录: {e}").into()))?;
     }
 
     // 如果数据库文件不存在，创建一个空文件
     if !db_path.exists() {
         std::fs::File::create(&db_path)
-            .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库文件: {}", e).into()))?;
+            .map_err(|e| sqlx::Error::Configuration(format!("无法创建数据库文件: {e}").into()))?;
         println!("✅ 创建新的数据库文件: {}", db_path.display());
     }
 
@@ -194,7 +194,7 @@ async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
         sqlx::query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
             .fetch_all(&state.db)
             .await
-            .map_err(|e| format!("数据库查询错误: {}", e))?;
+            .map_err(|e| format!("数据库查询错误: {e}"))?;
 
     let users: Vec<User> = rows
         .into_iter()
@@ -218,7 +218,7 @@ async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
 
 // 创建新用户
 async fn create_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
-    let req: CreateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {}", e))?;
+    let req: CreateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {e}"))?;
 
     let user_id = Uuid::new_v4().to_string();
     let created_at = Utc::now();
@@ -230,7 +230,7 @@ async fn create_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Val
         .bind(created_at.to_rfc3339())
         .execute(&state.db)
         .await
-        .map_err(|e| format!("创建用户失败: {}", e))?;
+        .map_err(|e| format!("创建用户失败: {e}"))?;
 
     let user = User {
         id: user_id,
@@ -254,7 +254,7 @@ async fn get_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value,
         .bind(user_id)
         .fetch_optional(&state.db)
         .await
-        .map_err(|e| format!("数据库查询错误: {}", e))?;
+        .map_err(|e| format!("数据库查询错误: {e}"))?;
 
     match row {
         Some(row) => {
@@ -280,14 +280,14 @@ async fn get_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value,
 // 更新用户
 async fn update_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
     let user_id = ctx.get_param("id").ok_or("缺少用户ID参数")?;
-    let req: UpdateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {}", e))?;
+    let req: UpdateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {e}"))?;
 
     // 检查用户是否存在
     let existing = sqlx::query("SELECT id FROM users WHERE id = ?")
         .bind(user_id)
         .fetch_optional(&state.db)
         .await
-        .map_err(|e| format!("数据库查询错误: {}", e))?;
+        .map_err(|e| format!("数据库查询错误: {e}"))?;
 
     if existing.is_none() {
         return Err("用户不存在".to_string());
@@ -322,7 +322,7 @@ async fn update_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Val
     sqlx_query
         .execute(&state.db)
         .await
-        .map_err(|e| format!("更新用户失败: {}", e))?;
+        .map_err(|e| format!("更新用户失败: {e}"))?;
 
     // 返回更新后的用户
     get_user(ctx, state).await
@@ -336,7 +336,7 @@ async fn delete_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Val
         .bind(user_id)
         .execute(&state.db)
         .await
-        .map_err(|e| format!("删除用户失败: {}", e))?;
+        .map_err(|e| format!("删除用户失败: {e}"))?;
 
     if result.rows_affected() == 0 {
         return Err("用户不存在".to_string());

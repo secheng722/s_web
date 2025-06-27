@@ -41,7 +41,7 @@ impl Router {
     /// Add a route with the specified method, pattern, and handler
     pub fn add_route(&mut self, method: &str, pattern: &str, handler: HandlerFunc) {
         let parts = Self::parse_pattern(pattern);
-        let key = format!("{}-{}", method, pattern);
+        let key = format!("{method}-{pattern}");
         self.roots
             .entry(method.to_string())
             .or_default()

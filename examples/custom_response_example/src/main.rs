@@ -138,7 +138,7 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppError::NotFound => write!(f, "Resource not found"),
-            AppError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            AppError::ValidationError(msg) => write!(f, "Validation error: {msg}"),
             AppError::DatabaseError => write!(f, "Database error occurred"),
             AppError::Unauthorized => write!(f, "Unauthorized access"),
         }
@@ -151,7 +151,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (message, code) = match self {
             AppError::NotFound => ("Resource not found".to_string(), 404),
-            AppError::ValidationError(msg) => (format!("Validation error: {}", msg), 400),
+            AppError::ValidationError(msg) => (format!("Validation error: {msg}"), 400),
             AppError::DatabaseError => ("Database error occurred".to_string(), 500),
             AppError::Unauthorized => ("Unauthorized access".to_string(), 401),
         };

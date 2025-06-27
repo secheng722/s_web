@@ -12,7 +12,7 @@ pub async fn create_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
     // 从参数中获取用户ID
     let user_id = match ctx.get_param("user_id") {
         Some(id) => {
-            println!("create_article: user_id found = {}", id);
+            println!("create_article: user_id found = {id}");
             id
         }
         None => {
@@ -29,7 +29,7 @@ pub async fn create_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Err(e) => {
             return ResponseBuilder::new()
                 .status(StatusCode::BAD_REQUEST)
-                .body(format!("Invalid request body: {}", e));
+                .body(format!("Invalid request body: {e}"));
         }
     };
 
@@ -68,12 +68,12 @@ pub async fn create_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
                 Ok(article) => json!(article).into_response(),
                 Err(e) => ResponseBuilder::new()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Database error: {}", e)),
+                    .body(format!("Database error: {e}")),
             }
         }
         Err(e) => ResponseBuilder::new()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Database error: {}", e)),
+            .body(format!("Database error: {e}")),
     }
 }
 
@@ -92,7 +92,7 @@ pub async fn get_all_articles(state: Arc<AppState>, _ctx: RequestCtx) -> Respons
         Ok(articles) => json!(articles).into_response(),
         Err(e) => ResponseBuilder::new()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Database error: {}", e)),
+            .body(format!("Database error: {e}")),
     }
 }
 
@@ -123,7 +123,7 @@ pub async fn get_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Ok(None) => (StatusCode::NOT_FOUND, "Article not found").into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            format!("Database error: {e}"),
         )
             .into_response(),
     }
@@ -168,7 +168,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Err(e) => {
             return ResponseBuilder::new()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(format!("Database error: {}", e));
+                .body(format!("Database error: {e}"));
         }
     };
 
@@ -178,7 +178,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                format!("Invalid request body: {}", e),
+                format!("Invalid request body: {e}"),
             )
                 .into_response();
         }
@@ -219,14 +219,14 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
                 Ok(article) => json!(article).into_response(),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
+                    format!("Database error: {e}"),
                 )
                     .into_response(),
             }
         }
         Err(e) => ResponseBuilder::new()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Failed to update article: {}", e)),
+            .body(format!("Failed to update article: {e}")),
     }
 }
 
@@ -281,7 +281,7 @@ pub async fn delete_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
                     .body(""),
                 Err(e) => ResponseBuilder::new()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Failed to delete article: {}", e)),
+                    .body(format!("Failed to delete article: {e}")),
             }
         }
         Ok(None) => ResponseBuilder::new()
@@ -289,6 +289,6 @@ pub async fn delete_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
             .body("Article not found or you don't have permission"),
         Err(e) => ResponseBuilder::new()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Database error: {}", e)),
+            .body(format!("Database error: {e}")),
     }
 }

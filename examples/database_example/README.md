@@ -70,24 +70,44 @@ cargo run
 
 ## 🧪 测试 API
 
+服务器运行在 `http://127.0.0.1:3000`
+
+### 查看 API 文档
+
+```bash
+curl http://127.0.0.1:3000/
+# 返回: HTML 页面，包含完整的 API 文档
+```
+
+### 健康检查
+
+```bash
+curl http://127.0.0.1:3000/health
+# 返回: {"status": "healthy", "timestamp": "...", "service": "ree-database-example"}
+```
+
 ### 创建用户
 
 ```bash
 curl -X POST http://127.0.0.1:3000/api/v1/users \
   -H 'Content-Type: application/json' \
   -d '{"name":"张三","email":"zhangsan@example.com"}'
+# 返回: 创建的用户信息，包含生成的 UUID
 ```
 
 ### 获取所有用户
 
 ```bash
 curl http://127.0.0.1:3000/api/v1/users
+# 返回: 所有用户的数组
 ```
 
 ### 获取特定用户
 
 ```bash
+# 使用创建时返回的 UUID
 curl http://127.0.0.1:3000/api/v1/users/{user_id}
+# 返回: 用户详细信息
 ```
 
 ### 更新用户
@@ -95,13 +115,35 @@ curl http://127.0.0.1:3000/api/v1/users/{user_id}
 ```bash
 curl -X PUT http://127.0.0.1:3000/api/v1/users/{user_id} \
   -H 'Content-Type: application/json' \
-  -d '{"name":"李四"}'
+  -d '{"name":"李四","email":"lisi@example.com"}'
+# 返回: 更新后的用户信息
 ```
 
 ### 删除用户
 
 ```bash
 curl -X DELETE http://127.0.0.1:3000/api/v1/users/{user_id}
+# 返回: 删除确认消息
+```
+
+### 错误处理示例
+
+```bash
+# 用户不存在 (404)
+curl http://127.0.0.1:3000/api/v1/users/nonexistent-id
+# 返回: {"error": "用户未找到"}
+
+# 无效的 JSON (400)
+curl -X POST http://127.0.0.1:3000/api/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"invalid": json}'
+# 返回: {"error": "Invalid request body"}
+
+# 缺少必填字段 (400)
+curl -X POST http://127.0.0.1:3000/api/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+# 返回: 反序列化错误信息
 ```
 
 ## 🔧 技术栈

@@ -1,6 +1,6 @@
 # Ree Framework - 自定义响应类型示例
 
-这个示例展示了如何在 Ree 框架中创建自定义响应类型并实现 `IntoResponse` trait。
+这个示例展示了如何在 Ree 框架中创建自定义响应类型并实现 `IntoResponse` trait，提供类型安全的 API 响应和错误处理。
 
 ## 🎯 核心特性
 
@@ -13,6 +13,11 @@ pub struct ApiResponse<T> {
     pub message: String,
     pub timestamp: DateTime<Utc>,
     pub code: u16,
+}
+
+impl<T: Serialize> ApiResponse<T> {
+    pub fn success(data: T) -> Self { /* ... */ }
+    pub fn error(message: String, code: u16) -> Self { /* ... */ }
 }
 
 impl<T: Serialize> IntoResponse for ApiResponse<T> {
@@ -50,6 +55,13 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        // 根据错误类型自动设置状态码和消息
+    }
+}
+```
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
         // 错误自动转换为标准 API 响应格式
     }
 }
@@ -64,41 +76,55 @@ cargo run
 
 ## 🧪 测试端点
 
+服务器运行在 `http://127.0.0.1:8080`
+
 ### 成功响应示例
 ```bash
 # 基本 API 响应
 curl http://127.0.0.1:8080/
-
-# 获取所有用户
-curl http://127.0.0.1:8080/users
-
-# 获取特定用户
-curl http://127.0.0.1:8080/users/1
-
-# 分页响应
-curl http://127.0.0.1:8080/users/page/1
-curl http://127.0.0.1:8080/users/page/2
-
-# 统计数据
-curl http://127.0.0.1:8080/stats
+# 返回: {"success":true,"data":"Welcome to Custom Response Example! 🎉",...}
 
 # 健康检查
 curl http://127.0.0.1:8080/health
+# 返回: {"success":true,"data":"Server is healthy! 🚀",...}
+
+# 获取所有用户
+curl http://127.0.0.1:8080/users
+# 返回: 包含4个用户的数组
+
+# 获取特定用户
+curl http://127.0.0.1:8080/users/1
+# 返回: Alice 的用户信息
+
+# 分页响应
+curl http://127.0.0.1:8080/users/page/1
+# 返回: 第1页，2个用户 + 分页信息
+
+curl http://127.0.0.1:8080/users/page/2
+# 返回: 第2页，2个用户 + 分页信息
+
+# 统计数据
+curl http://127.0.0.1:8080/stats
+# 返回: 用户统计信息
 ```
 
 ### 错误处理示例
 ```bash
 # 资源不存在 (404)
 curl http://127.0.0.1:8080/users/999
+# 返回: {"success":false,"message":"User not found",...}
 
 # 无效参数 (400)
 curl http://127.0.0.1:8080/users/invalid
+# 返回: {"success":false,"message":"Invalid user ID format",...}
 
 # 模拟数据库错误 (500)
 curl http://127.0.0.1:8080/error
+# 返回: {"success":false,"message":"Database connection failed",...}
 
 # 模拟资源不存在 (404)
 curl http://127.0.0.1:8080/notfound
+# 返回: {"success":false,"message":"Resource not found",...}
 ```
 
 ## 📋 响应格式示例

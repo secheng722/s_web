@@ -24,7 +24,6 @@
 [dependencies]
 ree = { git = "https://github.com/secheng722/ree" }
 tokio = { version = "1.45.1", features = ["full"] }
-serde_json = "1.0"
 ```
 
 ### Simple Handler Examples

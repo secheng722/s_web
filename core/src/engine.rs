@@ -148,10 +148,63 @@ impl Engine {
         self
     }
 
+    /// Automatically add swagger endpoints based on registered routes
+    fn add_swagger_endpoints(&mut self) {
+        // Collect all routes from main router and groups
+        let mut all_routes = Vec::new();
+
+        // Add routes from main router
+        all_routes.extend(self.router.get_all_routes());
+
+        // Add routes from all groups
+        for group in self.groups.values() {
+            all_routes.extend(group.router.get_all_routes());
+        }
+
+        if all_routes.is_empty() {
+            return;
+        }
+
+        let json_path = "/docs/swagger.json";
+        let ui_path = "/docs/";
+
+        // Add swagger.json endpoint
+        self.get(json_path, move |_ctx: RequestCtx| {
+            let routes = all_routes.clone();
+            async move {
+                use crate::response::ResponseBuilder;
+                use crate::swagger::generate_swagger_json;
+
+                let json = generate_swagger_json(&routes);
+                ResponseBuilder::new()
+                    .status(hyper::StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(json)
+            }
+        });
+
+        // Add swagger UI endpoint
+        self.get(ui_path, |_ctx: RequestCtx| async {
+            use crate::response::ResponseBuilder;
+            use crate::swagger::generate_swagger_ui;
+
+            let html = generate_swagger_ui("/docs/swagger.json");
+            ResponseBuilder::new()
+                .status(hyper::StatusCode::OK)
+                .header("Content-Type", "text/html")
+                .body(html)
+        });
+
+        println!("📖 Swagger UI available at /docs/");
+    }
+
     /// Start the HTTP server
-    pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(mut self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         let addr = addr.parse::<SocketAddr>()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
+
+        // Add swagger endpoints automatically
+        self.add_swagger_endpoints();
 
         // Pre-process groups for optimal matching
         let mut group_data: Vec<(String, Arc<RouterGroup>)> = self

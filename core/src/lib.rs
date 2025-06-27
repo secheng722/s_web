@@ -8,6 +8,7 @@ mod handler;
 mod middleware;
 mod response;
 mod router;
+mod swagger;
 mod trie;
 
 // =============================================================================

@@ -1,13 +1,7 @@
 //! HTTP router with trie-based pattern matching.
 
+use crate::{Handler, RequestCtx, Response, ResponseBuilder, trie::Node};
 use std::collections::HashMap;
-use crate::{
-    RequestCtx,
-    Response,
-    ResponseBuilder,
-    Handler,
-    trie::Node,
-};
 
 type HandlerFunc = Box<dyn Handler>;
 
@@ -16,6 +10,15 @@ type HandlerFunc = Box<dyn Handler>;
 pub struct Router {
     roots: HashMap<String, Node>,
     handlers: HashMap<String, HandlerFunc>,
+}
+
+impl std::fmt::Debug for Router {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Router")
+            .field("roots", &self.roots)
+            .field("handlers", &self.handlers.keys().collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl Router {
@@ -77,21 +80,37 @@ impl Router {
         self.handlers.get(key)
     }
 
+    /// Get all registered routes (method, pattern) for swagger generation
+    pub fn get_all_routes(&self) -> Vec<(String, String)> {
+        let mut routes = Vec::new();
+        
+        for (method, root) in &self.roots {
+            let mut patterns = Vec::new();
+            root.collect_patterns(&mut patterns);
+            
+            for pattern in patterns {
+                routes.push((method.clone(), pattern));
+            }
+        }
+        
+        routes
+    }
+
     /// Handle an HTTP request
     pub async fn handle_request(&self, mut ctx: RequestCtx) -> Response {
         let method = ctx.request.method().as_str();
         let path = ctx.request.uri().path();
         let (node, params) = self.get_route(method, path);
-        
+
         if node.is_none() {
             return ResponseBuilder::not_found();
         }
-        
+
         // Merge routing parameters and middleware parameters instead of overwriting
         ctx.params.extend(params);
         let node = node.unwrap();
         let key = format!("{}-{}", method, node.pattern);
-        
+
         if let Some(handler) = self.handle(&key) {
             handler.handle(ctx).await
         } else {
@@ -106,16 +125,8 @@ mod tests {
     #[test]
     fn test_new_router() {
         let mut router = Router::new();
-        router.add_route(
-            "GET",
-            "/",
-            Box::new(|_ctx| async { "Hello, World!" }),
-        );
-        router.add_route(
-            "GET",
-            "/hello",
-            Box::new(|_ctx| async { "Hello!" }),
-        );
+        router.add_route("GET", "/", Box::new(|_ctx| async { "Hello, World!" }));
+        router.add_route("GET", "/hello", Box::new(|_ctx| async { "Hello!" }));
         assert_eq!(router.roots.len(), 2);
     }
 

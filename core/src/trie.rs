@@ -24,7 +24,7 @@ impl Node {
     fn match_child_mut(&mut self, path: &str) -> Option<&mut Node> {
         self.children
             .iter_mut()
-            .find(|child| child.part == path || child.iswild)
+            .find(|child| child.part == path)
     }
 
     fn match_children(&self, path: &str) -> Vec<&Node> {
@@ -72,6 +72,17 @@ impl Node {
         }
         None
     }
+
+    /// Collect all patterns from this node and its children
+    pub fn collect_patterns(&self, patterns: &mut Vec<String>) {
+        if !self.pattern.is_empty() {
+            patterns.push(self.pattern.clone());
+        }
+        
+        for child in &self.children {
+            child.collect_patterns(patterns);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -99,5 +110,19 @@ mod tests {
         let result = root.search(&["p", "rust", "doc"], 0);
         assert!(result.is_some());
         assert_eq!(result.unwrap().pattern, "/p/:lang/doc");
+    }
+
+    #[test]
+    fn test_collect_patterns() {
+        let mut root = Node::new();
+        root.insert("/p/:lang/doc", vec!["p", ":lang", "doc"], 0);
+        root.insert("/p/go/doc", vec!["p", "go", "doc"], 0);
+        
+        let mut patterns = Vec::new();
+        root.collect_patterns(&mut patterns);
+        
+        assert_eq!(patterns.len(), 2);
+        assert!(patterns.contains(&"/p/:lang/doc".to_string()));
+        assert!(patterns.contains(&"/p/go/doc".to_string()));
     }
 }

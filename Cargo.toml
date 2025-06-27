@@ -7,6 +7,7 @@ members = [
     "examples/article_system_example",
     "examples/chain_example",
     "examples/custom_response_example",
+    "examples/swagger_example",
 ]
 resolver = "2"
 

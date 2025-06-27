@@ -112,9 +112,6 @@ pub fn generate_swagger_ui(json_url: &str) -> String {
 <head>
     <title>Ree API Documentation</title>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
-    <style>
-        .swagger-ui .topbar {{ display: none; }}
-    </style>
 </head>
 <body>
     <div id="swagger-ui"></div>
@@ -123,26 +120,7 @@ pub fn generate_swagger_ui(json_url: &str) -> String {
         SwaggerUIBundle({{
             url: '{json_url}',
             dom_id: '#swagger-ui',
-            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone],
-            deepLinking: true,
-            showExtensions: true,
-            showCommonExtensions: true,
-            tryItOutEnabled: true,
-            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
-            onComplete: function() {{
-                console.log('Swagger UI loaded');
-            }},
-            requestInterceptor: function(request) {{
-                console.log('Request:', request);
-                return request;
-            }},
-            responseInterceptor: function(response) {{
-                console.log('Response:', response);
-                return response;
-            }},
-            docExpansion: 'list',
-            filter: true,
-            showRequestHeaders: true
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone]
         }});
     </script>
 </body>

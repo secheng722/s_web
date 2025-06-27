@@ -194,17 +194,17 @@ impl Engine {
                 .header("Content-Type", "text/html")
                 .body(html)
         });
-
-        println!("📖 Swagger UI available at /docs/");
     }
 
     /// Start the HTTP server
     pub async fn run(mut self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         let addr = addr.parse::<SocketAddr>()?;
+        println!("🚀 Server running on http://{addr}");
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
         // Add swagger endpoints automatically
         self.add_swagger_endpoints();
+        println!("📖 Swagger UI available at http://{addr}/docs/");
 
         // Pre-process groups for optimal matching
         let mut group_data: Vec<(String, Arc<RouterGroup>)> = self
@@ -224,8 +224,6 @@ impl Engine {
         let has_global_middleware = !global_middlewares.is_empty();
         // hyper graceful shutdown
         let graceful = GracefulShutdown::new();
-
-        println!("🚀 Server running on http://{addr}");
 
         loop {
             tokio::select! {

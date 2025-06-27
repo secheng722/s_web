@@ -14,6 +14,7 @@
 - **🔒 Type Safety**: Compile-time guarantees for request/response handling correctness
 - **🔗 Functional Style**: Intuitive functional middleware makes development effortless and natural
 - **🛑 Graceful Shutdown**: Supports graceful shutdown to safely close HTTP server while ensuring in-flight requests can complete
+- **📖 Automatic Swagger Support**: Automatically generates Swagger documentation for all registered routes and provides an interactive API documentation via Swagger UI (due to certain limitations, POST request JSON data may need manual adjustment during testing).
 
 ## 🚀 Quick Start
 
@@ -73,6 +74,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.get("/created", handler(|_| async {
         (ree::StatusCode::CREATED, "Resource created")
     }));
+
+
+    //Chain call
+    //Because middleware and routing support chain calls, you can organize your code more flexibly
+    //The system will handle the execution order of the middleware itself
+    app.get("/chained", handler(|_| async {
+        "This is a chained response"
+    })).get("/another", handler(|_| async {
+        "Another chained response"
+    })).use_middleware(|ctx, next| async move {
+        println!("Middleware executed");
+        next(ctx).await
+    });
     
     app.run("127.0.0.1:8080").await?;
     Ok(())

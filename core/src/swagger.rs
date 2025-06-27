@@ -50,6 +50,17 @@ pub fn generate_swagger_json(routes: &[(String, String)]) -> String {
                 }
             }
 
+            // Add optional Authorization header
+            parameters.push(json!({
+                "name": "Authorization",
+                "in": "header",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                },
+                "description": "Bearer token for authentication"
+            }));
+
             if !parameters.is_empty() {
                 operation["parameters"] = json!(parameters);
             }
@@ -120,7 +131,9 @@ pub fn generate_swagger_ui(json_url: &str) -> String {
         SwaggerUIBundle({{
             url: '{json_url}',
             dom_id: '#swagger-ui',
-            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone]
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone],
+            tryItOutEnabled: true,
+            showRequestHeaders: true
         }});
     </script>
 </body>

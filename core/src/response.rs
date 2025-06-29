@@ -1,7 +1,7 @@
 //! HTTP response utilities and type conversions.
 
+use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
 use hyper::body::Bytes;
-use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
 
 pub type Response = hyper::Response<BoxBody<Bytes, hyper::Error>>;
 
@@ -224,6 +224,22 @@ where
         let (status, content) = self;
         let mut response = content.into_response();
         *response.status_mut() = status;
+        response
+    }
+}
+
+impl<T> IntoResponse for (hyper::StatusCode, &'static str, T)
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        let (status, content_type, content) = self;
+        let mut response = content.into_response();
+        *response.status_mut() = status;
+        response.headers_mut().insert(
+            hyper::header::CONTENT_TYPE,
+            hyper::header::HeaderValue::from_static(content_type),
+        );
         response
     }
 }

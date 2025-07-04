@@ -163,21 +163,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
-``` mermaid
-
-graph TD
-    A[开始: 接收到请求路径] --> B[调用 Router::get_route]
-    B --> C[解析请求路径: parse_pattern]
-    C --> D[解析路由模式: parse_pattern]
-    D --> E["检查是否有根节点: self.roots.get(method)"]
-    E -->|无根节点| F[返回 404]
-    E -->|有根节点| G[调用 Trie::search 匹配路径]
-    G --> H[检查当前路径部分是否匹配]
-    H -->|匹配| I[检查是否为 * 通配符]
-    I -->|是 * 通配符| J[提取剩余路径部分到 params]
-    J --> K[返回匹配的路由节点和参数]
-    I -->|不是 * 通配符| L[继续匹配下一个路径部分]
-    L -->|路径匹配完成| K
-    K --> M[调用对应的处理器]
-    M --> N[返回处理器的响应]
-```

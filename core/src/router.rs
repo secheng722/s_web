@@ -83,16 +83,16 @@ impl Router {
     /// Get all registered routes (method, pattern) for swagger generation
     pub fn get_all_routes(&self) -> Vec<(String, String)> {
         let mut routes = Vec::new();
-        
+
         for (method, root) in &self.roots {
             let mut patterns = Vec::new();
             root.collect_patterns(&mut patterns);
-            
+
             for pattern in patterns {
                 routes.push((method.clone(), pattern));
             }
         }
-        
+
         routes
     }
 
@@ -148,5 +148,27 @@ mod tests {
         let (node, params) = router.get_route("GET", "/p/rust/doc");
         assert!(node.is_some());
         assert_eq!(params.get("lang").unwrap(), "rust");
+    }
+
+    #[test]
+    fn test_static_file_route() {
+        let mut router = Router::new();
+
+        // 添加静态文件路由
+        router.add_route(
+            "GET",
+            "/static/*filepath",
+            Box::new(|_ctx| async { "Static file handler" }),
+        );
+
+        // 测试匹配静态文件路径
+        let (node, params) = router.get_route("GET", "/static/js/app.js");
+
+        // 验证路由节点是否匹配
+        assert!(node.is_some());
+        assert_eq!(node.unwrap().pattern, "/static/*filepath");
+
+        // 验证参数是否正确提取
+        assert_eq!(params.get("filepath").unwrap(), "js/app.js");
     }
 }

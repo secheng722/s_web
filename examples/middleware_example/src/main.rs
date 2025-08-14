@@ -73,11 +73,10 @@ async fn timer(name: &'static str, ctx: RequestCtx, next: Next) -> Response {
 #[allow(dead_code)]
 /// 🚀 认证中间件
 async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
-    if let Some(auth) = ctx.request.headers().get("Authorization") {
-        if auth.to_str().unwrap_or("") == token {
+    if let Some(auth) = ctx.request.headers().get("Authorization")
+        && auth.to_str().unwrap_or("") == token {
             return next(ctx).await;
         }
-    }
     (
         ree::StatusCode::UNAUTHORIZED,
         json!({"error": "Unauthorized"}),
@@ -193,9 +192,9 @@ fn extract_user_from_token(token: &str) -> String {
 async fn jwt_require_role(required_role: &'static str, ctx: RequestCtx, next: Next) -> Response {
     // 这个中间件应该在 jwt_auth 之后使用
     // 从 Authorization header 获取并解析角色
-    if let Some(auth_header) = ctx.request.headers().get("Authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+    if let Some(auth_header) = ctx.request.headers().get("Authorization")
+        && let Ok(auth_str) = auth_header.to_str()
+            && let Some(token) = auth_str.strip_prefix("Bearer ") {
                 let parts: Vec<&str> = token.split('.').collect();
                 if parts.len() == 3 {
                     let role = parts[1];
@@ -205,8 +204,6 @@ async fn jwt_require_role(required_role: &'static str, ctx: RequestCtx, next: Ne
                     }
                 }
             }
-        }
-    }
 
     (
         ree::StatusCode::FORBIDDEN,
@@ -381,11 +378,10 @@ async fn request_id(ctx: RequestCtx, next: Next) -> Response {
 
 /// 🚀 API密钥验证中间件 - 使用简洁的函数式风格
 async fn api_key_auth(valid_key: &'static str, ctx: RequestCtx, next: Next) -> Response {
-    if let Some(api_key) = ctx.request.headers().get("X-API-Key") {
-        if api_key.to_str().unwrap_or("") == valid_key {
+    if let Some(api_key) = ctx.request.headers().get("X-API-Key")
+        && api_key.to_str().unwrap_or("") == valid_key {
             return next(ctx).await;
         }
-    }
 
     (
         ree::StatusCode::UNAUTHORIZED,
@@ -397,15 +393,14 @@ async fn api_key_auth(valid_key: &'static str, ctx: RequestCtx, next: Next) -> R
 /// 🚀 内容类型验证中间件 - 无参数版本，不需要宏
 #[allow(dead_code)]
 async fn require_json(ctx: RequestCtx, next: Next) -> Response {
-    if let Some(content_type) = ctx.request.headers().get("Content-Type") {
-        if content_type
+    if let Some(content_type) = ctx.request.headers().get("Content-Type")
+        && content_type
             .to_str()
             .unwrap_or("")
             .starts_with("application/json")
         {
             return next(ctx).await;
         }
-    }
 
     (
         ree::StatusCode::BAD_REQUEST,

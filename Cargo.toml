@@ -9,5 +9,6 @@ members = [
     "examples/custom_response_example",
     "examples/swagger_example",
     "examples/upload_example",
+    "examples/lifecycle_example",
 ]
 resolver = "2"

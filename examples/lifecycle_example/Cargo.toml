@@ -1,0 +1,18 @@
+[package]
+name = "lifecycle_example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "lifecycle_example"
+path = "src/main.rs"
+
+[[bin]]
+name = "simple"
+path = "src/simple.rs"
+
+[dependencies]
+ree = { path = "../../core" }
+tokio = { version = "1.45.1", features = ["full"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }

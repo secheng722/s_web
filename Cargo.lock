@@ -934,6 +934,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lifecycle_example"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ree",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "litemap"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

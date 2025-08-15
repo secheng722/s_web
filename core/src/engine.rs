@@ -12,6 +12,9 @@ use crate::{
     response::IntoResponse,
 };
 
+/// Type alias for lifecycle hooks
+type LifecycleHook = Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
+
 /// A group of routes with shared prefix and middleware
 pub struct RouterGroup {
     prefix: String,
@@ -85,6 +88,8 @@ pub struct Engine {
     router: Router,
     groups: HashMap<String, RouterGroup>,
     middlewares: Vec<Middleware>,
+    startup_hooks: Vec<LifecycleHook>,
+    shutdown_hooks: Vec<LifecycleHook>,
 }
 
 impl Engine {
@@ -94,6 +99,8 @@ impl Engine {
             router: Router::new(),
             groups: HashMap::new(),
             middlewares: Vec::new(),
+            startup_hooks: Vec::new(),
+            shutdown_hooks: Vec::new(),
         }
     }
 
@@ -108,6 +115,34 @@ impl Engine {
             Box::pin(fut) as Pin<Box<dyn Future<Output = Response> + Send>>
         };
         self.middlewares.push(Arc::new(wrapped));
+        self
+    }
+
+    /// Add a startup hook that will be executed when the server starts
+    pub fn on_startup<F, Fut>(mut self, f: F) -> Self 
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let wrapped = move || {
+            let fut = f();
+            Box::pin(fut) as Pin<Box<dyn Future<Output = ()> + Send>>
+        };
+        self.startup_hooks.push(Box::new(wrapped));
+        self
+    }
+
+    /// Add a shutdown hook that will be executed during graceful shutdown
+    pub fn on_shutdown<F, Fut>(mut self, f: F) -> Self 
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let wrapped = move || {
+            let fut = f();
+            Box::pin(fut) as Pin<Box<dyn Future<Output = ()> + Send>>
+        };
+        self.shutdown_hooks.push(Box::new(wrapped));
         self
     }
 
@@ -198,6 +233,11 @@ impl Engine {
 
     /// Start the HTTP server
     pub async fn run(mut self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Execute startup hooks
+        for hook in &self.startup_hooks {
+            hook().await;
+        }
+
         let addr = addr.parse::<SocketAddr>()?;
         println!("🚀 Server running on http://{addr}");
         let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -307,6 +347,12 @@ impl Engine {
                 _ = tokio::signal::ctrl_c() => {
                     drop(listener);
                     eprintln!("\n🛑 Graceful shutdown signal received");
+                    
+                    // Execute shutdown hooks
+                    for hook in &self.shutdown_hooks {
+                        hook().await;
+                    }
+                    
                     break;
                 }
             }

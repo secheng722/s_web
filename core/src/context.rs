@@ -32,6 +32,11 @@ impl RequestCtx {
         self.params.get(key)
     }
 
+    /// Get a parameter value as a string (convenience method)
+    pub fn param(&self, key: &str) -> Option<&str> {
+        self.params.get(key).map(|s| s.as_str())
+    }
+
     /// Add a parameter to the context
     pub fn add_param(&mut self, key: String, value: String) {
         self.params.insert(key, value);

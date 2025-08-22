@@ -10,5 +10,6 @@ members = [
     "examples/swagger_example",
     "examples/upload_example",
     "examples/lifecycle_example",
+    "examples/swagger_custom_example",
 ]
 resolver = "2"

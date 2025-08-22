@@ -35,6 +35,9 @@ pub use response::{IntoResponse, Response, ResponseBuilder};
 /// Middleware system
 pub use middleware::{IntoNext, Next};
 
+/// Swagger API documentation
+pub use swagger::SwaggerInfo;
+
 // =============================================================================
 // Advanced/Internal API Exports
 // =============================================================================

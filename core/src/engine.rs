@@ -9,7 +9,7 @@ use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 
 use crate::{
     Handler, Middleware, Next, RequestCtx, Response, Router, execute_chain, middleware::IntoNext,
-    response::IntoResponse,
+    response::IntoResponse, swagger::SwaggerInfo,
 };
 
 /// Type alias for lifecycle hooks
@@ -90,6 +90,7 @@ pub struct Engine {
     middlewares: Vec<Middleware>,
     startup_hooks: Vec<LifecycleHook>,
     shutdown_hooks: Vec<LifecycleHook>,
+    swagger_info: HashMap<String, SwaggerInfo>,
 }
 
 impl Engine {
@@ -101,6 +102,7 @@ impl Engine {
             middlewares: Vec::new(),
             startup_hooks: Vec::new(),
             shutdown_hooks: Vec::new(),
+            swagger_info: HashMap::new(),
         }
     }
 
@@ -165,9 +167,23 @@ impl Engine {
         self
     }
 
+    /// Add a GET route with swagger info
+    pub fn get_with_swagger(&mut self, path: &str, handler: impl Handler, swagger_info: SwaggerInfo) -> &mut Self {
+        self.add_route("GET", path, handler);
+        self.swagger_for_route("GET", path, swagger_info);
+        self
+    }
+
     /// Add a POST route
     pub fn post(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("POST", path, handler);
+        self
+    }
+
+    /// Add a POST route with swagger info
+    pub fn post_with_swagger(&mut self, path: &str, handler: impl Handler, swagger_info: SwaggerInfo) -> &mut Self {
+        self.add_route("POST", path, handler);
+        self.swagger_for_route("POST", path, swagger_info);
         self
     }
 
@@ -177,9 +193,30 @@ impl Engine {
         self
     }
 
+    /// Add a PUT route with swagger info
+    pub fn put_with_swagger(&mut self, path: &str, handler: impl Handler, swagger_info: SwaggerInfo) -> &mut Self {
+        self.add_route("PUT", path, handler);
+        self.swagger_for_route("PUT", path, swagger_info);
+        self
+    }
+
     /// Add a DELETE route
     pub fn delete(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("DELETE", path, handler);
+        self
+    }
+
+    /// Add a DELETE route with swagger info
+    pub fn delete_with_swagger(&mut self, path: &str, handler: impl Handler, swagger_info: SwaggerInfo) -> &mut Self {
+        self.add_route("DELETE", path, handler);
+        self.swagger_for_route("DELETE", path, swagger_info);
+        self
+    }
+
+    /// Set swagger info for a specific route
+    pub fn swagger_for_route(&mut self, method: &str, path: &str, swagger_info: SwaggerInfo) -> &mut Self {
+        let route_key = format!("{}-{}", method.to_uppercase(), path);
+        self.swagger_info.insert(route_key, swagger_info);
         self
     }
 
@@ -203,14 +240,18 @@ impl Engine {
         let json_path = "/docs/swagger.json";
         let ui_path = "/docs/";
 
+        // Clone swagger_info for use in closure
+        let swagger_info = self.swagger_info.clone();
+
         // Add swagger.json endpoint
         self.get(json_path, move |_ctx: RequestCtx| {
             let routes = all_routes.clone();
+            let swagger_info = swagger_info.clone();
             async move {
                 use crate::response::ResponseBuilder;
-                use crate::swagger::generate_swagger_json;
+                use crate::swagger::generate_enhanced_swagger_json;
 
-                let json = generate_swagger_json(&routes);
+                let json = generate_enhanced_swagger_json(&routes, &swagger_info);
                 ResponseBuilder::new()
                     .status(hyper::StatusCode::OK)
                     .header("Content-Type", "application/json")

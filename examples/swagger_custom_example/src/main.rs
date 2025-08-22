@@ -11,13 +11,6 @@ struct User {
     name: String,
     email: String,
 }
-
-#[derive(Serialize, Deserialize)]
-struct CreateUserRequest {
-    name: String,
-    email: String,
-}
-
 async fn get_users(_ctx: RequestCtx) -> String {
     let users = vec![
         User {
@@ -47,7 +40,7 @@ async fn get_user_by_id(ctx: RequestCtx) -> String {
     serde_json::to_string(&user).unwrap()
 }
 
-async fn create_user(ctx: RequestCtx) -> String {
+async fn create_user(_ctx: RequestCtx) -> String {
     // In real app, you'd parse the body
     let new_user = User {
         id: 3,

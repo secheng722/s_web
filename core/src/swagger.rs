@@ -463,8 +463,3 @@ pub fn generate_swagger_ui(json_url: &str) -> String {
         json_url = json_url
     )
 }
-
-/// Legacy function for backward compatibility
-pub fn generate_swagger_json(routes: &[(String, String)]) -> String {
-    generate_enhanced_swagger_json(routes, &HashMap::new())
-}

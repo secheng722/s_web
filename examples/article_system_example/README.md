@@ -1,6 +1,6 @@
-# Ree Framework - 博客API系统示例
+# s_web Framework - 博客API系统示例
 
-基于 Rust 和 Ree 框架构建的完整博客API系统，提供用户认证、文章管理等功能。
+基于 Rust 和 s_web 框架构建的完整博客API系统，提供用户认证、文章管理等功能。
 
 ## 📋 目录
 
@@ -37,7 +37,7 @@
 ## 🛠️ 技术栈
 
 ### 后端
-- **框架**: [Ree](https://github.com/lsc/ree) - 轻量级异步Web框架
+- **框架**: [s_web](https://github.com/lsc/ree) - 轻量级异步Web框架
 - **数据库**: SQLite + SQLx
 - **认证**: JWT (jsonwebtoken)
 - **密码加密**: bcrypt

@@ -1,6 +1,6 @@
-# Ree Framework - 自定义响应类型示例
+# s_web Framework - 自定义响应类型示例
 
-这个示例展示了如何在 Ree 框架中创建自定义响应类型并实现 `IntoResponse` trait，提供类型安全的 API 响应和错误处理。
+这个示例展示了如何在 s_web 框架中创建自定义响应类型并实现 `IntoResponse` trait，提供类型安全的 API 响应和错误处理。
 
 ## 🎯 核心特性
 

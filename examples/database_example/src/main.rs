@@ -33,7 +33,7 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🎯 Ree Framework - Database Example");
+    println!("🎯 s_web Framework - Database Example");
     println!("═══════════════════════════════════");
     println!("📊 SQLite + CRUD API Demo");
     println!();
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!({
             "status": "healthy",
             "timestamp": Utc::now(),
-            "service": "ree-database-example"
+            "service": "s-web-database-example"
         })
     });
 

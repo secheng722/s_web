@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 添加一些路由
     let mut app = app;
-    app.get("/", |_| async { "Hello from Ree with lifecycle hooks!" });
+    app.get("/", |_| async { "Hello from s_web with lifecycle hooks!" });
     app.get("/health", |_| async { "OK" });
 
     println!("🌟 Simple lifecycle example");

@@ -1,4 +1,4 @@
-# Ree HTTP Framework
+# s_web HTTP Framework
 
 🚀 现代化、简洁高效的 Rust HTTP 框架，基于 Hyper 构建，具有**零成本函数式中间件**和**优雅的开发**体验。
 
@@ -20,14 +20,14 @@
 
 ```toml
 [dependencies]
-ree = { git = "https://github.com/secheng722/ree" }
+s_web = { git = "https://github.com/secheng722/ree" }
 tokio = { version = "1.45.1", features = ["full"] }
 ```
 
 ### 简单处理器示例
 
 ```rust
-use ree::Engine;
+use s_web::Engine;
 use serde_json::json;
 
 #[tokio::main]
@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.get("/json", |_| async { 
         json!({
             "message": "你好 JSON",
-            "framework": "Ree",
+            "framework": "s_web",
             "version": "0.1.0"
         })
     }));
@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 自定义状态码
     app.get("/created", |_| async {
-        (ree::StatusCode::CREATED, "Resource created")
+        (s_web::StatusCode::CREATED, "Resource created")
     });
 
     // 链式调用
@@ -91,10 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🛠 优雅的函数式中间件系统
 
-Ree 引入了一种极其简洁优雅的函数式中间件系统，使得编写和使用中间件变得前所未有的简单：
+s_web 引入了一种极其简洁优雅的函数式中间件系统，使得编写和使用中间件变得前所未有的简单：
 
 ```rust
-use ree::{Engine, RequestCtx, Next, Response, ResponseBuilder};
+use s_web::{Engine, RequestCtx, Next, Response, ResponseBuilder};
 
 // 🎯 参数化中间件 - 简洁而强大！
 async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
@@ -104,7 +104,7 @@ async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
         }
     }
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "Unauthorized"}),
     )
         .into_response()
@@ -132,7 +132,7 @@ async fn jwt_auth(secret: &'static str, ctx: RequestCtx, next: Next) -> Response
     }
 
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "无效或缺失的 JWT 令牌"}),
     )
         .into_response()

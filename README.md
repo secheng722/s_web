@@ -1,4 +1,4 @@
-# Ree HTTP Framework
+# s_web HTTP Framework
 
 📖 **中文文档**: [README_CN.md](README_CN.md)
 
@@ -22,7 +22,7 @@
 
 ```toml
 [dependencies]
-ree = { git = "https://github.com/secheng722/ree" }
+s_web = { git = "https://github.com/secheng722/ree" }
 tokio = { version = "1.45.1", features = ["full"] }
 ```
 

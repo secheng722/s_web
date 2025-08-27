@@ -5,7 +5,7 @@ use serde_json::json;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
 
-    println!("🎯 Ree HTTP Framework - API Usage Guide");
+    println!("🎯 s_web HTTP Framework - API Usage Guide");
     println!("═══════════════════════════════════════════");
     println!("✨ Unified API Design - Automatic Type Conversion!");
     println!("   🎉 All handler functions support direct return of various types");
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.get("/simple/json", |_| async {
         json!({
             "message": "Automatic JSON conversion",
-            "framework": "Ree",
+            "framework": "s_web",
             "easy": true,
             "unified_api": true
         })
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ResponseBuilder::new()
             .status(s_web::StatusCode::OK)
             .content_type("application/json; charset=utf-8")
-            .header("X-Custom-Header", "ReeFramework")
+            .header("X-Custom-Header", "s_web_Framework")
             .body(r#"{"message": "Response with custom headers"}"#)
     });
 
@@ -113,14 +113,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Ree Framework Demo</title>
+                <title>s_web Framework Demo</title>
                 <style>
                     body { font-family: Arial, sans-serif; margin: 40px; }
                     .highlight { background: #f0f8ff; padding: 20px; border-radius: 8px; }
                 </style>
             </head>
             <body>
-                <h1>🎯 Ree HTTP Framework</h1>
+                <h1>🎯 s_web HTTP Framework</h1>
                 <div class="highlight">
                     <h2>统一API设计</h2>
                     <p><strong>自动转换</strong>：所有处理函数都支持直接返回各种类型</p>

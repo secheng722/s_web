@@ -3,7 +3,7 @@ use serde_json::json;
 use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
 
 // =============================================================================
-// 🎉 REE中间件系统 - 使用更简洁的中间件写法
+// 🎉 s_web中间件系统 - 使用更简洁的中间件写法
 // =============================================================================
 //
 // 这个示例展示了如何使用更简洁的中间件函数来简化中间件的编写。
@@ -632,7 +632,7 @@ pub fn advanced_rate_limit(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
 
-    println!("🛠 Ree HTTP Framework - Function-based Middleware System");
+    println!("🛠 s_web HTTP Framework - Function-based Middleware System");
     println!("════════════════════════════════════════════════════════");
     println!("✨ Modern function-based middleware API, zero-cost and composable!");
     println!("🎯 使用简洁的函数式中间件，更直观、更灵活！");
@@ -825,7 +825,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[allow(dead_code)]
 async fn index(_ctx: RequestCtx) -> Response {
     json!({
-        "message": "欢迎使用REE框架",
+        "message": "欢迎使用s_web框架",
         "version": "1.0.0",
         "description": "一个简单、高效的Rust Web框架"
     })

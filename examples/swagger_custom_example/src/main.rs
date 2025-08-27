@@ -1,4 +1,4 @@
-//! Custom Swagger configuration example for Ree framework
+//! Custom Swagger configuration example for s_web framework
 //! This example demonstrates how to use SwaggerInfo for route documentation
 
 use s_web::{swagger, Engine, RequestCtx};

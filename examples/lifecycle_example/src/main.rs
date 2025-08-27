@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.get("/", |_| async {
         if IS_INITIALIZED.load(Ordering::SeqCst) {
             serde_json::json!({
-                "message": "Hello from Ree!",
+                "message": "Hello from s_web!",
                 "status": "initialized",
                 "timestamp": chrono::Utc::now().to_rfc3339()
             })

@@ -27,7 +27,7 @@ impl Default for UserPreferences {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
     
-    println!("🎯 Ree - 结构体转换示例");
+    println!("🎯 s_web - 结构体转换示例");
     println!("═══════════════════════");
     
     // 方式1: 使用原有的 body_json 方法（支持可选body）

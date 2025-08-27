@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.use_middleware(|ctx, next| logger("Global", ctx, next))
         .use_middleware(cors)
         // 路由链式调用
-        .get("/", |_| async { "Welcome to Ree!" })
+        .get("/", |_| async { "Welcome to s_web!" })
         .get("/health", |_| async { json!({"status": "ok"}) });
 
     // API 路由组，支持链式调用

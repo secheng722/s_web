@@ -53,7 +53,7 @@ impl<T: Serialize> IntoResponse for ApiResponse<T> {
             Ok(json) => ResponseBuilder::new()
                 .status(status_code)
                 .header("Content-Type", "application/json")
-                .header("X-Powered-By", "Ree Framework")
+                .header("X-Powered-By", "s_web Framework")
                 .body(json),
             Err(_) => ResponseBuilder::new()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -281,7 +281,7 @@ async fn health_check(_ctx: RequestCtx) -> ApiResponse<String> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
 
-    println!("🎨 自定义响应类型示例 - Ree Framework");
+    println!("🎨 自定义响应类型示例 - s_web Framework");
     println!("===============================================");
 
     // 基本路由

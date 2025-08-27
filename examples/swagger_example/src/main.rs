@@ -5,7 +5,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
 
     // 添加一些路由
-    app.get("/", |_| async { "Hello, Ree!" })
+    app.get("/", |_| async { "Hello, s_web!" })
         .get("/users", |_| async { "List of users" })
         .post("/users", |_| async { "Create user" })
         .get("/users/:id", |ctx: RequestCtx| async move {

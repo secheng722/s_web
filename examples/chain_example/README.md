@@ -1,6 +1,6 @@
-# Ree Framework - 链式调用示例
+# s_web Framework - 链式调用示例
 
-这个示例展示了 Ree 框架支持链式调用后的优雅语法。
+这个示例展示了 s_web 框架支持链式调用后的优雅语法。
 
 ## 🎯 主要改进
 
@@ -26,7 +26,7 @@ let mut app = Engine::new();
 app.use_middleware(|ctx, next| logger("Global", ctx, next))
     .use_middleware(cors)
     // 路由链式调用
-    .get("/", |_| async { "Welcome to Ree!" })
+    .get("/", |_| async { "Welcome to s_web!" })
     .get("/health", |_| async { json!({"status": "ok"}) });
 
 // API 路由组，支持链式调用
@@ -71,7 +71,7 @@ cargo run
 ```bash
 # 基本端点
 curl http://127.0.0.1:8080/
-# 返回: "Welcome to Ree!"
+# 返回: "Welcome to s_web!"
 
 curl http://127.0.0.1:8080/health
 # 返回: {"status": "ok"}

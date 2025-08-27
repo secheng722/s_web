@@ -1,7 +1,7 @@
 use bcrypt::{hash, verify};
 use chrono::Utc;
 use jsonwebtoken::{encode, EncodingKey, Header};
-use ree::{IntoResponse, RequestCtx, Response, ResponseBuilder, StatusCode};
+use s_web::{IntoResponse, RequestCtx, Response, ResponseBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;

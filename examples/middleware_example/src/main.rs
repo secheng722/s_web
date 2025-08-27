@@ -1,4 +1,4 @@
-use ree::{Engine, IntoResponse, Next, RequestCtx, Response, ResponseBuilder};
+use s_web::{Engine, IntoResponse, Next, RequestCtx, Response, ResponseBuilder};
 use serde_json::json;
 use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
 
@@ -78,7 +78,7 @@ async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
             return next(ctx).await;
         }
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "Unauthorized"}),
     )
         .into_response()
@@ -91,7 +91,7 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
         Some(header) => header,
         None => {
             return ResponseBuilder::new()
-                .status(ree::StatusCode::UNAUTHORIZED)
+                .status(s_web::StatusCode::UNAUTHORIZED)
                 .header("Content-Type", "application/json")
                 .body(json!({"error": "缺少认证头"}).to_string());
         }
@@ -102,7 +102,7 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
         Ok(s) => s,
         Err(_) => {
             return ResponseBuilder::new()
-                .status(ree::StatusCode::BAD_REQUEST)
+                .status(s_web::StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
                 .body(json!({"error": "无效的认证头"}).to_string());
         }
@@ -111,7 +111,7 @@ async fn auth_simple(token_value: &'static str, ctx: RequestCtx, next: Next) -> 
     // 检查令牌是否有效
     if auth_str != format!("Bearer {token_value}") {
         return ResponseBuilder::new()
-            .status(ree::StatusCode::FORBIDDEN)
+            .status(s_web::StatusCode::FORBIDDEN)
             .header("Content-Type", "application/json")
             .body(
                 json!({
@@ -144,7 +144,7 @@ async fn jwt_auth(secret: &'static str, ctx: RequestCtx, next: Next) -> Response
     }
 
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "Invalid or missing JWT token"}),
     )
         .into_response()
@@ -206,7 +206,7 @@ async fn jwt_require_role(required_role: &'static str, ctx: RequestCtx, next: Ne
             }
 
     (
-        ree::StatusCode::FORBIDDEN,
+        s_web::StatusCode::FORBIDDEN,
         json!({"error": format!("Access denied. Required role: {}", required_role)}),
     )
         .into_response()
@@ -323,7 +323,7 @@ async fn rate_limit(max_requests: usize, ctx: RequestCtx, next: Next) -> Respons
 
     if current >= max_requests {
         return ResponseBuilder::new()
-            .status(ree::StatusCode::TOO_MANY_REQUESTS)
+            .status(s_web::StatusCode::TOO_MANY_REQUESTS)
             .header("Content-Type", "application/json")
             .body(json!({"error": "Rate limit exceeded", "limit": max_requests}).to_string());
     }
@@ -384,7 +384,7 @@ async fn api_key_auth(valid_key: &'static str, ctx: RequestCtx, next: Next) -> R
         }
 
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "Invalid or missing API key"}),
     )
         .into_response()
@@ -403,7 +403,7 @@ async fn require_json(ctx: RequestCtx, next: Next) -> Response {
         }
 
     (
-        ree::StatusCode::BAD_REQUEST,
+        s_web::StatusCode::BAD_REQUEST,
         json!({"error": "Content-Type must be application/json"}),
     )
         .into_response()
@@ -460,7 +460,7 @@ impl RateLimitBuilder {
                 let current = requests_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if current >= max_requests {
                     (
-                        ree::StatusCode::TOO_MANY_REQUESTS,
+                        s_web::StatusCode::TOO_MANY_REQUESTS,
                         json!({
                             "error": "Rate limit exceeded",
                             "limit": max_requests,
@@ -609,7 +609,7 @@ pub fn advanced_rate_limit(
             let current = requests_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if current >= max_requests {
                 (
-                    ree::StatusCode::TOO_MANY_REQUESTS,
+                    s_web::StatusCode::TOO_MANY_REQUESTS,
                     json!({
                         "error": "Rate limit exceeded",
                         "limit": max_requests,

@@ -67,39 +67,46 @@ pub struct SecurityRequirement {
     pub scopes: Vec<String>,
 }
 
-impl SwaggerInfo {
-    /// Create a new SwaggerInfo instance
+/// Builder pattern for creating SwaggerInfo
+pub struct SwaggerBuilder {
+    info: SwaggerInfo,
+}
+
+impl SwaggerBuilder {
+    /// Create a new SwaggerBuilder
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            info: SwaggerInfo::default(),
+        }
     }
 
     /// Set summary
     pub fn summary<S: Into<String>>(mut self, summary: S) -> Self {
-        self.summary = Some(summary.into());
+        self.info.summary = Some(summary.into());
         self
     }
 
     /// Set description
     pub fn description<S: Into<String>>(mut self, description: S) -> Self {
-        self.description = Some(description.into());
+        self.info.description = Some(description.into());
         self
     }
 
     /// Add a tag
     pub fn tag<S: Into<String>>(mut self, tag: S) -> Self {
-        self.tags.push(tag.into());
+        self.info.tags.push(tag.into());
         self
     }
 
     /// Add a parameter
-    pub fn parameter<S: Into<String>>(
+    pub fn parameter<S: Into<String>, T: Into<String>>(
         mut self,
         name: S,
-        in_: S,
+        in_: T,
         description: Option<String>,
         required: bool,
     ) -> Self {
-        self.parameters.push(Parameter {
+        self.info.parameters.push(Parameter {
             name: name.into(),
             in_: in_.into(),
             description,
@@ -115,28 +122,23 @@ impl SwaggerInfo {
         self
     }
 
+    /// Add a path parameter (convenience method)
+    pub fn path_param<S: Into<String>>(self, name: S, description: S) -> Self {
+        self.parameter(name, "path", Some(description.into()), true)
+    }
+
+    /// Add a query parameter (convenience method)
+    pub fn query_param<S: Into<String>>(self, name: S, description: S, required: bool) -> Self {
+        self.parameter(name, "query", Some(description.into()), required)
+    }
+
     /// Add a response
     pub fn response<S: Into<String>>(mut self, status: S, description: S) -> Self {
-        let mut content = HashMap::new();
-        content.insert(
-            "application/json".to_string(),
-            MediaType {
-                schema: Schema {
-                    type_: "object".to_string(),
-                    format: None,
-                    example: None,
-                    properties: None,
-                    items: None,
-                },
-                example: None,
-            },
-        );
-
-        self.responses.insert(
+        self.info.responses.insert(
             status.into(),
             ApiResponse {
                 description: description.into(),
-                content: Some(content),
+                content: None,
             },
         );
         self
@@ -164,7 +166,7 @@ impl SwaggerInfo {
             },
         );
 
-        self.responses.insert(
+        self.info.responses.insert(
             status.into(),
             ApiResponse {
                 description: description.into(),
@@ -191,7 +193,7 @@ impl SwaggerInfo {
             },
         );
 
-        self.request_body = Some(RequestBody {
+        self.info.request_body = Some(RequestBody {
             description: Some("Request body".to_string()),
             content,
             required: true,
@@ -201,21 +203,52 @@ impl SwaggerInfo {
 
     /// Add security requirement
     pub fn security<S: Into<String>>(mut self, name: S, scopes: Vec<String>) -> Self {
-        self.security.push(SecurityRequirement {
+        self.info.security.push(SecurityRequirement {
             name: name.into(),
             scopes,
         });
         self
     }
 
-    /// Add bearer token authentication
+    /// Add bearer token authentication (convenience method)
     pub fn bearer_auth(mut self) -> Self {
-        self.security.push(SecurityRequirement {
+        self.info.security.push(SecurityRequirement {
             name: "bearerAuth".to_string(),
             scopes: vec![],
         });
-        self
+        self.response("401", "Unauthorized - Bearer token required")
     }
+
+    /// Add common success responses (convenience method)
+    pub fn success_responses(self) -> Self {
+        self.response("200", "Success")
+            .response("500", "Internal Server Error")
+    }
+
+    /// Add common CRUD responses (convenience method)
+    pub fn crud_responses(self) -> Self {
+        self.response("200", "Success")
+            .response("400", "Bad Request")
+            .response("401", "Unauthorized")
+            .response("404", "Not Found")
+            .response("500", "Internal Server Error")
+    }
+
+    /// Build the final SwaggerInfo
+    pub fn build(self) -> SwaggerInfo {
+        self.info
+    }
+}
+
+impl Default for SwaggerBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience function to create a new SwaggerBuilder
+pub fn swagger() -> SwaggerBuilder {
+    SwaggerBuilder::new()
 }
 
 /// Generate enhanced OpenAPI JSON with custom swagger info

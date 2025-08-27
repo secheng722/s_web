@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use ree::{IntoResponse, Next, RequestCtx, Response, StatusCode};
+use s_web::{IntoResponse, Next, RequestCtx, Response, StatusCode};
 
 use crate::config::AppState;
 
@@ -9,7 +9,7 @@ use crate::config::AppState;
 pub async fn logging_middleware(
     prefix: &'static str,
     ctx: RequestCtx,
-    next: ree::Next,
+    next: s_web::Next,
 ) -> Response {
     let start = Utc::now();
     println!(

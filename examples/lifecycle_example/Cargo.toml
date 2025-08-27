@@ -12,7 +12,7 @@ name = "simple"
 path = "src/simple.rs"
 
 [dependencies]
-ree = { path = "../../core" }
+s_web = { path = "../../core" }
 tokio = { version = "1.45.1", features = ["full"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }

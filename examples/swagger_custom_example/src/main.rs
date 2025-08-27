@@ -1,7 +1,7 @@
 //! Custom Swagger configuration example for Ree framework
-//! This example demonstrates the new enhanced swagger system with custom configurations
+//! This example demonstrates how to use SwaggerInfo for route documentation
 
-use ree::{Engine, RequestCtx, SwaggerInfo};
+use s_web::{swagger, Engine, RequestCtx};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -24,19 +24,19 @@ async fn get_users(_ctx: RequestCtx) -> String {
             email: "bob@example.com".to_string(),
         },
     ];
-    
+
     serde_json::to_string(&users).unwrap()
 }
 
 async fn get_user_by_id(ctx: RequestCtx) -> String {
-    let user_id = ctx.param("id").unwrap_or("0");
-    
+    let user_id = ctx.get_param("id").map_or("0", |v| v);
+
     let user = User {
         id: user_id.parse().unwrap_or(0),
         name: format!("User {}", user_id),
         email: format!("user{}@example.com", user_id),
     };
-    
+
     serde_json::to_string(&user).unwrap()
 }
 
@@ -47,158 +47,101 @@ async fn create_user(_ctx: RequestCtx) -> String {
         name: "New User".to_string(),
         email: "newuser@example.com".to_string(),
     };
-    
+
     serde_json::to_string(&new_user).unwrap()
 }
 
 async fn update_user(ctx: RequestCtx) -> String {
-    let user_id = ctx.param("id").unwrap_or("0");
-    
+    let user_id = ctx.get_param("id").map_or("0", |v| v);
+
     let updated_user = User {
         id: user_id.parse().unwrap_or(0),
         name: "Updated User".to_string(),
         email: "updated@example.com".to_string(),
     };
-    
+
     serde_json::to_string(&updated_user).unwrap()
 }
 
 async fn delete_user(ctx: RequestCtx) -> String {
-    let user_id = ctx.param("id").unwrap_or("0");
+    let user_id = ctx.get_param("id").map_or("0", |v| v);
     json!({
         "message": format!("User {} deleted successfully", user_id)
-    }).to_string()
+    })
+    .to_string()
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Starting Custom Swagger Example Server...");
-    
+
     let mut app = Engine::new();
 
     // Configure detailed swagger documentation for each endpoint
 
     // GET /users - List all users
-    app.get_with_swagger(
-        "/users", 
-        get_users,
-        SwaggerInfo::new()
-            .summary("Get all users")
-            .description("Retrieve a list of all users in the system")
-            .tag("Users")
-            .json_response("200", "List of users", Some(json!([
-                {
-                    "id": 1,
-                    "name": "Alice",
-                    "email": "alice@example.com"
-                }
-            ])))
-            .bearer_auth()
-    );
+    app.get("/users", get_users);
 
     // GET /users/:id - Get user by ID
-    app.get_with_swagger(
-        "/users/:id",
-        get_user_by_id,
-        SwaggerInfo::new()
-            .summary("Get user by ID")
-            .description("Retrieve a specific user by their unique identifier")
-            .tag("Users")
-            .parameter("id", "path", Some("User ID".to_string()), true)
-            .json_response("200", "User details", Some(json!({
-                "id": 1,
-                "name": "Alice",
-                "email": "alice@example.com"
-            })))
-            .response("404", "User not found")
-            .bearer_auth()
-    );
+    app.get("/users/:id", get_user_by_id);
 
     // POST /users - Create new user
+    // app.post("/users", create_user);
     app.post_with_swagger(
         "/users",
         create_user,
-        SwaggerInfo::new()
+        swagger()
             .summary("Create a new user")
-            .description("Create a new user account in the system")
-            .tag("Users")
+            .description("This endpoint creates a new user.")
+            .tag("User")
             .request_body(json!({
-                "name": "John Doe",
-                "email": "john@example.com"
+                "name": "New User",
+                "email": "newuser@example.com"
             }))
-            .json_response("201", "User created successfully", Some(json!({
-                "id": 3,
-                "name": "John Doe",
-                "email": "john@example.com"
-            })))
-            .response("400", "Invalid input data")
-            .bearer_auth()
+            .response("201", "User created successfully")
+            .json_response("201", "User created successfully", Some(json!(
+                User {
+                    id: 3,
+                    name: "New User".to_string(),
+                    email: "newuser@example.com".to_string(),
+                }
+            )))
+            .build()
     );
 
     // PUT /users/:id - Update user
-    app.put_with_swagger(
-        "/users/:id",
-        update_user,
-        SwaggerInfo::new()
-            .summary("Update user")
-            .description("Update an existing user's information")
-            .tag("Users")
-            .parameter("id", "path", Some("User ID to update".to_string()), true)
-            .request_body(json!({
-                "name": "Updated Name",
-                "email": "updated@example.com"
-            }))
-            .json_response("200", "User updated successfully", Some(json!({
-                "id": 1,
-                "name": "Updated Name",
-                "email": "updated@example.com"
-            })))
-            .response("404", "User not found")
-            .response("400", "Invalid input data")
-            .bearer_auth()
-    );
+    app.put("/users/:id", update_user);
 
     // DELETE /users/:id - Delete user
-    app.delete_with_swagger(
-        "/users/:id",
-        delete_user,
-        SwaggerInfo::new()
-            .summary("Delete user")
-            .description("Remove a user from the system")
-            .tag("Users")
-            .parameter("id", "path", Some("User ID to delete".to_string()), true)
-            .json_response("200", "User deleted successfully", Some(json!({
-                "message": "User deleted successfully"
-            })))
-            .response("404", "User not found")
-            .bearer_auth()
-    );
+    app.delete("/users/:id", delete_user);
 
     // Add some routes without custom swagger (will use auto-generation)
     app.get("/health", |_ctx: RequestCtx| async {
         json!({
             "status": "healthy",
             "timestamp": chrono::Utc::now().to_rfc3339()
-        }).to_string()
+        })
+        .to_string()
     });
 
     app.get("/version", |_ctx: RequestCtx| async {
         json!({
             "version": "1.0.0",
             "name": "Swagger Custom Example"
-        }).to_string()
+        })
+        .to_string()
     });
 
-    println!("📖 Custom Swagger documentation will be available at:");
-    println!("   http://127.0.0.1:3000/docs/");
+    println!("📖 Swagger documentation will be available at:");
+    println!("   http://127.0.0.1:3000/swagger-ui");
     println!("📄 Raw OpenAPI JSON at:");
-    println!("   http://127.0.0.1:3000/docs/swagger.json");
+    println!("   http://127.0.0.1:3000/api-docs");
     println!("\n🎯 Available endpoints:");
-    println!("   GET    /users           - List all users (with custom swagger)");
-    println!("   GET    /users/:id       - Get user by ID (with custom swagger)");
-    println!("   POST   /users           - Create user (with custom swagger)");
-    println!("   PUT    /users/:id       - Update user (with custom swagger)");
-    println!("   DELETE /users/:id       - Delete user (with custom swagger)");
+    println!("   GET    /users           - List all users (auto swagger)");
+    println!("   GET    /users/:id       - Get user by ID (auto swagger)");
+    println!("   POST   /users           - Create user (auto swagger)");
+    println!("   PUT    /users/:id       - Update user (auto swagger)");
+    println!("   DELETE /users/:id       - Delete user (auto swagger)");
     println!("   GET    /health          - Health check (auto swagger)");
     println!("   GET    /version         - Version info (auto swagger)");
 

@@ -1,4 +1,4 @@
-use ree::{Engine, ResponseBuilder};
+use s_web::{Engine, ResponseBuilder};
 use serde_json::json;
 
 #[tokio::main]
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 路径参数
-    app.get("/simple/greet/:name", |ctx: ree::RequestCtx| async move {
+    app.get("/simple/greet/:name", |ctx: s_web::RequestCtx| async move {
         let name = ctx.get_param("name").map_or("Guest", |v| v);
         format!("Hello, {name}! 👋")
     });
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Result处理 - 自动转换错误
     app.get(
         "/simple/result/:action",
-        |ctx: ree::RequestCtx| async move {
+        |ctx: s_web::RequestCtx| async move {
             match ctx.get_param("action").map_or("", |v| v) {
                 "success" => Ok("Operation completed! ✅"),
                 "fail" => Err("Something went wrong! ❌"),
@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Option处理 - None自动变404
-    app.get("/simple/find/:id", |ctx: ree::RequestCtx| async move {
+    app.get("/simple/find/:id", |ctx: s_web::RequestCtx| async move {
         let id = ctx.get_param("id").map_or("", |v| v);
         if id == "123" {
             Some(json!({
@@ -76,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 状态码控制
     app.post("/simple/create", |_| async {
         (
-            ree::StatusCode::CREATED,
+            s_web::StatusCode::CREATED,
             json!({
                 "message": "Resource created",
                 "id": 456
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 自定义响应头
     app.get("/advanced/headers", |_| async {
         ResponseBuilder::new()
-            .status(ree::StatusCode::OK)
+            .status(s_web::StatusCode::OK)
             .content_type("application/json; charset=utf-8")
             .header("X-Custom-Header", "ReeFramework")
             .body(r#"{"message": "Response with custom headers"}"#)
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 自定义状态码和内容类型
     app.get("/advanced/custom", |_| async {
         ResponseBuilder::new()
-            .status(ree::StatusCode::IM_A_TEAPOT)
+            .status(s_web::StatusCode::IM_A_TEAPOT)
             .content_type("text/plain; charset=utf-8")
             .body("I'm a teapot! This is advanced response control. ☕")
     });
@@ -143,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 错误处理
     app.get("/advanced/error", |_| async {
         ResponseBuilder::new()
-            .status(ree::StatusCode::BAD_REQUEST)
+            .status(s_web::StatusCode::BAD_REQUEST)
             .content_type("application/json; charset=utf-8")
             .body(r#"{"error": "Bad Request", "message": "This is a custom error response"}"#)
     });
@@ -156,7 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📮 POST Request Examples - Body Reading");
 
     // JSON body parsing
-    app.post("/post/json", |ctx: ree::RequestCtx| async move {
+    app.post("/post/json", |ctx: s_web::RequestCtx| async move {
         match ctx.body_json::<serde_json::Value>() {
             Ok(Some(json)) => format!("Received JSON: {json}"),
             Ok(None) => "No body provided".to_string(),
@@ -165,7 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Text body reading
-    app.post("/post/text", |ctx: ree::RequestCtx| async move {
+    app.post("/post/text", |ctx: s_web::RequestCtx| async move {
         match ctx.body_string() {
             Ok(Some(text)) => format!("Received text: {text}"),
             Ok(None) => "No body provided".to_string(),
@@ -174,7 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Raw bytes body reading
-    app.post("/post/bytes", |ctx: ree::RequestCtx| async move {
+    app.post("/post/bytes", |ctx: s_web::RequestCtx| async move {
         match ctx.body_bytes() {
             Some(bytes) => format!("Received {} bytes", bytes.len()),
             None => "No body provided".to_string(),
@@ -182,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Form data example (simple parsing)
-    app.post("/post/form", |ctx: ree::RequestCtx| async move {
+    app.post("/post/form", |ctx: s_web::RequestCtx| async move {
         match ctx.body_string() {
             Ok(Some(body)) => {
                 // Simple form parsing (in real app, use a proper form parser)

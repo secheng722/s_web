@@ -1,4 +1,4 @@
-use ree::{Engine, IntoResponse, Next, RequestCtx, Response};
+use s_web::{Engine, IntoResponse, Next, RequestCtx, Response};
 use serde_json::json;
 
 // 日志中间件
@@ -29,7 +29,7 @@ async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
     }
 
     (
-        ree::StatusCode::UNAUTHORIZED,
+        s_web::StatusCode::UNAUTHORIZED,
         json!({"error": "Unauthorized"}),
     )
         .into_response()

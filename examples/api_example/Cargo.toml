@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ree = { path = "../../core" }
+s_web = { path = "../../core" }
 tokio = { version = "1.45.1", features = ["full"] }
 serde_json = "1.0"

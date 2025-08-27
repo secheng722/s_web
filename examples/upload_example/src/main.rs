@@ -1,4 +1,4 @@
-use ree::{Engine, IntoResponse, RequestCtx, Response, ResponseBuilder};
+use s_web::{Engine, IntoResponse, RequestCtx, Response, ResponseBuilder};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -20,14 +20,14 @@ async fn upload_handler(ctx: RequestCtx) -> Response {
 
         if let Err(e) = fs::create_dir_all(save_dir).await {
             return (
-                ree::StatusCode::INTERNAL_SERVER_ERROR,
+                s_web::StatusCode::INTERNAL_SERVER_ERROR,
                 serde_json::json!({"ok": false, "error": format!("Failed to create upload dir: {e}")}),
             ).into_response()
         }
 
         if let Err(e) = fs::write(&save_path, bytes.clone()).await {
             return (
-                ree::StatusCode::INTERNAL_SERVER_ERROR,
+                s_web::StatusCode::INTERNAL_SERVER_ERROR,
                 serde_json::json!({"ok": false, "error": format!("Failed to write file: {e}")}),
             )
                 .into_response();
@@ -37,7 +37,7 @@ async fn upload_handler(ctx: RequestCtx) -> Response {
     }
 
     (
-        ree::StatusCode::BAD_REQUEST,
+        s_web::StatusCode::BAD_REQUEST,
         serde_json::json!({"ok": false, "error": "No file content in body"}),
     )
         .into_response()
@@ -51,21 +51,21 @@ async fn serve_uploads(ctx: RequestCtx) -> Response {
                 Ok(content) => {
                     let ct = mime_guess::from_path(&path).first_or_octet_stream();
                     ResponseBuilder::new()
-                        .status(ree::StatusCode::OK)
+                        .status(s_web::StatusCode::OK)
                         .header("Content-Type", ct.essence_str())
                         .body(content)
                 }
                 Err(e) => (
-                    ree::StatusCode::INTERNAL_SERVER_ERROR,
+                    s_web::StatusCode::INTERNAL_SERVER_ERROR,
                     format!("Failed to read file: {e}"),
                 )
                     .into_response(),
             }
         } else {
-            (ree::StatusCode::NOT_FOUND, "File not found").into_response()
+            (s_web::StatusCode::NOT_FOUND, "File not found").into_response()
         }
     } else {
-        (ree::StatusCode::BAD_REQUEST, "Invalid path").into_response()
+        (s_web::StatusCode::BAD_REQUEST, "Invalid path").into_response()
     }
 }
 
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Minimal index page to try with curl
     app.get("/", |_| async {
         (
-            ree::StatusCode::OK,
+            s_web::StatusCode::OK,
             "text/html; charset=utf-8",
             r#"
             <html>

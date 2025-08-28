@@ -1,8 +1,0 @@
-[package]
-name = "swagger_example"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-s_web = { path = "../../core" }
-tokio = { version = "1.0", features = ["full"] }

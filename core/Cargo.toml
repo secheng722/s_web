@@ -5,7 +5,7 @@ edition = "2024"
 description = "A simple HTTP framework for Rust"
 license = "MIT"
 authors = ["826216325@qq.com"]
-repository = "https://github.com/secheng722/ree"
+repository = "https://github.com/secheng722/s_web"
 keywords = ["http", "web", "framework", "async"]
 categories = ["web-programming::http-server"]
 

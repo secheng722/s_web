@@ -8,15 +8,13 @@ type HandlerFunc = Box<dyn Handler>;
 /// HTTP router for matching requests to handlers
 #[derive(Default)]
 pub struct Router {
-    roots: HashMap<String, Node>,
-    handlers: HashMap<String, HandlerFunc>,
+    roots: HashMap<String, Node<HandlerFunc>>,
 }
 
 impl std::fmt::Debug for Router {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Router")
             .field("roots", &self.roots)
-            .field("handlers", &self.handlers.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -44,16 +42,14 @@ impl Router {
     /// Add a route with the specified method, pattern, and handler
     pub fn add_route(&mut self, method: &str, pattern: &str, handler: HandlerFunc) {
         let parts = Self::parse_pattern(pattern);
-        let key = format!("{method}-{pattern}");
         self.roots
             .entry(method.to_string())
             .or_default()
-            .insert(pattern, parts, 0);
-        self.handlers.insert(key, handler);
+            .insert(pattern, &parts, 0, handler);
     }
 
     /// Get a route handler for the given method and path
-    pub fn get_route(&self, method: &str, path: &str) -> (Option<&Node>, HashMap<String, String>) {
+    pub fn get_route(&self, method: &str, path: &str) -> (Option<&Node<HandlerFunc>>, HashMap<String, String>) {
         let search_parts = Self::parse_pattern(path);
         let mut params = HashMap::new();
         let root = self.roots.get(method);
@@ -61,23 +57,20 @@ impl Router {
             return (None, HashMap::new());
         }
         if let Some(node) = root.unwrap().search(&search_parts, 0) {
-            let parts = Self::parse_pattern(&node.pattern);
-            for (index, ele) in parts.iter().enumerate() {
-                if let Some(param_name) = ele.strip_prefix(':') {
-                    params.insert(param_name.to_string(), search_parts[index].to_string());
-                } else if let Some(param_name) = ele.strip_prefix('*') {
-                    params.insert(param_name.to_string(), search_parts[index..].join("/"));
-                    break;
-                }
+            // Use pre-calculated params from the node
+            for (index, name_with_prefix) in &node.params {
+                if let Some(name) = name_with_prefix.strip_prefix(':') {
+                    if let Some(part) = search_parts.get(*index) {
+                        params.insert(name.to_string(), part.to_string());
+                    }
+                } else if let Some(name) = name_with_prefix.strip_prefix('*')
+                    && let Some(wild_val) = search_parts.get(*index..) {
+                        params.insert(name.to_string(), wild_val.join("/"));
+                    }
             }
             return (Some(node), params);
         }
         (None, HashMap::new())
-    }
-
-    /// Get a handler by key
-    pub fn handle(&self, key: &str) -> Option<&HandlerFunc> {
-        self.handlers.get(key)
     }
 
     /// Get all registered routes (method, pattern) for swagger generation
@@ -109,9 +102,8 @@ impl Router {
         // Merge routing parameters and middleware parameters instead of overwriting
         ctx.params.extend(params);
         let node = node.unwrap();
-        let key = format!("{}-{}", method, node.pattern);
-
-        if let Some(handler) = self.handle(&key) {
+        
+        if let Some(handler) = &node.value {
             handler.handle(ctx).await
         } else {
             ResponseBuilder::not_found()
@@ -127,7 +119,7 @@ mod tests {
         let mut router = Router::new();
         router.add_route("GET", "/", Box::new(|_ctx| async { "Hello, World!" }));
         router.add_route("GET", "/hello", Box::new(|_ctx| async { "Hello!" }));
-        assert_eq!(router.roots.len(), 2);
+        assert_eq!(router.roots.len(), 1); // "GET" root
     }
 
     #[test]

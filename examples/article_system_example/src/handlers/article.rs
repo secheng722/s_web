@@ -8,12 +8,12 @@ use crate::config::AppState;
 use crate::models::{Article, CreateArticleDto, UpdateArticleDto};
 
 // 创建文章
-pub async fn create_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
+pub async fn create_article(state: Arc<AppState>, mut ctx: RequestCtx) -> Response {
     // 从参数中获取用户ID
     let user_id = match ctx.get_param("user_id") {
         Some(id) => {
             println!("create_article: user_id found = {id}");
-            id
+            id.to_string()
         }
         None => {
             println!("create_article: user_id not found in params");
@@ -24,7 +24,7 @@ pub async fn create_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
     };
 
     // 解析请求体
-    let article_dto = match ctx.json::<CreateArticleDto>() {
+    let article_dto = match ctx.json::<CreateArticleDto>().await {
         Ok(article) => article,
         Err(e) => {
             return ResponseBuilder::new()
@@ -130,10 +130,10 @@ pub async fn get_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
 }
 
 // 更新文章
-pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
+pub async fn update_article(state: Arc<AppState>, mut ctx: RequestCtx) -> Response {
     // 从参数中获取用户ID
     let user_id = match ctx.get_param("user_id") {
-        Some(id) => id,
+        Some(id) => id.to_string(),
         None => {
             return (StatusCode::UNAUTHORIZED, "Not authenticated").into_response();
         }
@@ -141,7 +141,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
 
     // 从路径参数获取文章ID
     let article_id = match ctx.get_param("id") {
-        Some(id) => id,
+        Some(id) => id.to_string(),
         None => {
             return (StatusCode::BAD_REQUEST, "Missing article ID").into_response();
         }
@@ -153,8 +153,8 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
         SELECT * FROM articles WHERE id = ? AND author_id = ?
         "#,
     )
-    .bind(article_id)
-    .bind(user_id)
+    .bind(&article_id)
+    .bind(&user_id)
     .fetch_optional(&state.db)
     .await;
 
@@ -173,7 +173,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
     };
 
     // 解析请求体
-    let update_dto = match ctx.json::<UpdateArticleDto>() {
+    let update_dto = match ctx.json::<UpdateArticleDto>().await {
         Ok(update) => update,
         Err(e) => {
             return (
@@ -199,7 +199,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
     .bind(&title)
     .bind(&content)
     .bind(now)
-    .bind(article_id)
+    .bind(&article_id)
     .execute(&state.db)
     .await;
 
@@ -211,7 +211,7 @@ pub async fn update_article(state: Arc<AppState>, ctx: RequestCtx) -> Response {
                 SELECT * FROM articles WHERE id = ?
                 "#,
             )
-            .bind(article_id)
+            .bind(&article_id)
             .fetch_one(&state.db)
             .await;
 

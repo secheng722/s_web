@@ -31,8 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("═══════════════════════");
     
     // 方式1: 使用原有的 body_json 方法（支持可选body）
-    app.post("/api/user/create", |ctx: RequestCtx| async move {
-        match ctx.body_json::<User>() {
+    app.post("/api/user/create", |mut ctx: RequestCtx| async move {
+        match ctx.body_json::<User>().await {
             Ok(Some(user)) => {
                 println!("创建用户: {:?}", user);
                 format!("用户 {} 创建成功！", user.name)
@@ -43,8 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     
     // 方式2: 使用新的 json 方法（要求必须有body）
-    app.post("/api/user/update", |ctx: RequestCtx| async move {
-        match ctx.json::<User>() {
+    app.post("/api/user/update", |mut ctx: RequestCtx| async move {
+        match ctx.json::<User>().await {
             Ok(user) => {
                 println!("更新用户: {:?}", user);
                 format!("用户 {} 更新成功！", user.name)
@@ -54,8 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     
     // 方式3: 使用 json_or_default 方法（有默认值）
-    app.post("/api/user/preferences", |ctx: RequestCtx| async move {
-        match ctx.json_or_default::<UserPreferences>() {
+    app.post("/api/user/preferences", |mut ctx: RequestCtx| async move {
+        match ctx.json_or_default::<UserPreferences>().await {
             Ok(prefs) => {
                 println!("用户偏好设置: {:?}", prefs);
                 format!("偏好设置已保存: 主题={}, 通知={}", prefs.theme, prefs.notifications)
@@ -65,14 +65,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     
     // 复杂示例：组合使用
-    app.post("/api/user/profile", |ctx: RequestCtx| async move {
+    app.post("/api/user/profile", |mut ctx: RequestCtx| async move {
         #[derive(Deserialize)]
         struct ProfileRequest {
             user: User,
             preferences: Option<UserPreferences>,
         }
         
-        match ctx.json::<ProfileRequest>() {
+        match ctx.json::<ProfileRequest>().await {
             Ok(profile) => {
                 let prefs = profile.preferences.unwrap_or_default();
                 println!("完整资料: 用户={:?}, 偏好={:?}", profile.user, prefs);

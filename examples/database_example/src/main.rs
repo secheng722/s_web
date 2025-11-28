@@ -216,9 +216,9 @@ async fn get_users(state: AppState) -> Result<serde_json::Value, String> {
     }))
 }
 
-// 创建新用户
-async fn create_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
-    let req: CreateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {e}"))?;
+// 创建用户
+async fn create_user(mut ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
+    let req: CreateUserRequest = ctx.json().await.map_err(|e| format!("请求体解析错误: {e}"))?;
 
     let user_id = Uuid::new_v4().to_string();
     let created_at = Utc::now();
@@ -278,13 +278,13 @@ async fn get_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value,
 }
 
 // 更新用户
-async fn update_user(ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
-    let user_id = ctx.get_param("id").ok_or("缺少用户ID参数")?;
-    let req: UpdateUserRequest = ctx.json().map_err(|e| format!("请求体解析错误: {e}"))?;
+async fn update_user(mut ctx: RequestCtx, state: AppState) -> Result<serde_json::Value, String> {
+    let user_id = ctx.get_param("id").ok_or("缺少用户ID参数")?.clone();
+    let req: UpdateUserRequest = ctx.json().await.map_err(|e| format!("请求体解析错误: {e}"))?;
 
     // 检查用户是否存在
     let existing = sqlx::query("SELECT id FROM users WHERE id = ?")
-        .bind(user_id)
+        .bind(&user_id)
         .fetch_optional(&state.db)
         .await
         .map_err(|e| format!("数据库查询错误: {e}"))?;

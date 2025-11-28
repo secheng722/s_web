@@ -287,18 +287,24 @@ impl Engine {
         self.add_swagger_endpoints();
         println!("📖 Swagger UI available at http://{addr}/docs/");
 
-        // Pre-process groups for optimal matching
-        let mut group_data: Vec<(String, Arc<RouterGroup>)> = self
+        let global_middlewares = Arc::new(self.middlewares);
+        
+        // Pre-process groups for optimal matching and pre-combine middlewares
+        let mut group_data: Vec<(String, Arc<RouterGroup>, Arc<Vec<Middleware>>)> = self
             .groups
             .into_iter()
-            .map(|(prefix, group)| (prefix, Arc::new(group)))
+            .map(|(prefix, group)| {
+                let mut combined = Vec::with_capacity(global_middlewares.len() + group.middlewares.len());
+                combined.extend(global_middlewares.iter().cloned());
+                combined.extend(group.middlewares.iter().cloned());
+                (prefix, Arc::new(group), Arc::new(combined))
+            })
             .collect();
 
         // Sort by prefix length (longest first) for better matching
         group_data.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
 
         let router = Arc::new(self.router);
-        let global_middlewares = Arc::new(self.middlewares);
         let groups = Arc::new(group_data);
 
         // Pre-calculate if we have any middleware for optimization
@@ -326,29 +332,21 @@ impl Engine {
                                 // Fast path matching for groups
                                 let matched_group = groups
                                     .iter()
-                                    .find(|(prefix, _)| path.starts_with(prefix))
-                                    .map(|(_, group)| group.clone());
+                                    .find(|(prefix, _, _)| path.starts_with(prefix))
+                                    .map(|(_, group, middlewares)| (group.clone(), middlewares.clone()));
 
                                 let Ok(ctx) = RequestCtx::new(req).await else {
                                     eprintln!("Request context error");
                                     return Ok("Bad Request".into_response());
                                 };
 
-                                let response = if let Some(group) = matched_group {
+                                let response = if let Some((group, combined_middlewares)) = matched_group {
                                     // Group request handling
-                                    let has_group_middleware = !group.middlewares.is_empty();
-
-                                    if !has_global_middleware && !has_group_middleware {
+                                    if combined_middlewares.is_empty() {
                                         // Fast path: no middleware at all
                                         group.handle_request(ctx).await
                                     } else {
                                         // Middleware path
-                                        let mut combined_middlewares = Vec::with_capacity(
-                                            global_middlewares.len() + group.middlewares.len()
-                                        );
-                                        combined_middlewares.extend(global_middlewares.iter().cloned());
-                                        combined_middlewares.extend(group.middlewares.iter().cloned());
-
                                         let endpoint = (move |ctx| {
                                             let group = group.clone();
                                             async move { group.handle_request(ctx).await }

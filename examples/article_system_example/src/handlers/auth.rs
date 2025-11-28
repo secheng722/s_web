@@ -17,9 +17,9 @@ struct Claims {
 }
 
 // 注册新用户
-pub async fn register(state: Arc<AppState>, ctx: RequestCtx) -> Response {
+pub async fn register(state: Arc<AppState>, mut ctx: RequestCtx) -> Response {
     // 解析请求体
-    let user_dto = match ctx.json::<CreateUserDto>() {
+    let user_dto = match ctx.json::<CreateUserDto>().await {
         Ok(user) => user,
         Err(e) => {
             return ResponseBuilder::new()
@@ -104,9 +104,9 @@ pub async fn register(state: Arc<AppState>, ctx: RequestCtx) -> Response {
 }
 
 // 用户登录
-pub async fn login(state: Arc<AppState>, ctx: RequestCtx) -> Response {
+pub async fn login(state: Arc<AppState>, mut ctx: RequestCtx) -> Response {
     // 解析请求体
-    let login_dto = match ctx.json::<LoginDto>() {
+    let login_dto = match ctx.json::<LoginDto>().await {
         Ok(login) => login,
         Err(e) => {
             return ResponseBuilder::new()

@@ -2,19 +2,20 @@ use s_web::{Engine, IntoResponse, RequestCtx, Response, ResponseBuilder};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-async fn upload_handler(ctx: RequestCtx) -> Response {
-    // Expecting raw body bytes as file content for simplicity
-    if let Some(bytes) = ctx.body_bytes() {
-        // Optional: get filename from query like ?name=foo.bin
-        let name = ctx
-            .request
-            .uri()
-            .query()
-            .and_then(|q| q.split('&').find(|kv| kv.starts_with("name=")))
-            .and_then(|kv| kv.split('=').nth(1))
-            .unwrap_or("upload.bin");
+async fn upload_handler(mut ctx: RequestCtx) -> Response {
+    // Optional: get filename from query like ?name=foo.bin
+    let name = ctx
+        .request
+        .uri()
+        .query()
+        .and_then(|q| q.split('&').find(|kv| kv.starts_with("name=")))
+        .and_then(|kv| kv.split('=').nth(1))
+        .unwrap_or("upload.bin")
+        .to_string();
 
-        let safe_name = sanitize_filename::sanitize(name);
+    // Expecting raw body bytes as file content for simplicity
+    if let Ok(Some(bytes)) = ctx.body_bytes().await {
+        let safe_name = sanitize_filename::sanitize(&name);
         let save_dir = Path::new("uploads");
         let save_path: PathBuf = save_dir.join(&safe_name);
 

@@ -156,8 +156,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📮 POST Request Examples - Body Reading");
 
     // JSON body parsing
-    app.post("/post/json", |ctx: s_web::RequestCtx| async move {
-        match ctx.body_json::<serde_json::Value>() {
+    app.post("/post/json", |mut ctx: s_web::RequestCtx| async move {
+        match ctx.body_json::<serde_json::Value>().await {
             Ok(Some(json)) => format!("Received JSON: {json}"),
             Ok(None) => "No body provided".to_string(),
             Err(e) => format!("Failed to parse JSON: {e}"),
@@ -165,8 +165,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Text body reading
-    app.post("/post/text", |ctx: s_web::RequestCtx| async move {
-        match ctx.body_string() {
+    app.post("/post/text", |mut ctx: s_web::RequestCtx| async move {
+        match ctx.body_string().await {
             Ok(Some(text)) => format!("Received text: {text}"),
             Ok(None) => "No body provided".to_string(),
             Err(e) => format!("Failed to read text: {e}"),
@@ -174,16 +174,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Raw bytes body reading
-    app.post("/post/bytes", |ctx: s_web::RequestCtx| async move {
-        match ctx.body_bytes() {
-            Some(bytes) => format!("Received {} bytes", bytes.len()),
-            None => "No body provided".to_string(),
+    app.post("/post/bytes", |mut ctx: s_web::RequestCtx| async move {
+        match ctx.body_bytes().await {
+            Ok(Some(bytes)) => format!("Received {} bytes", bytes.len()),
+            Ok(None) => "No body provided".to_string(),
+            Err(e) => format!("Failed to read body: {e}"),
         }
     });
 
     // Form data example (simple parsing)
-    app.post("/post/form", |ctx: s_web::RequestCtx| async move {
-        match ctx.body_string() {
+    app.post("/post/form", |mut ctx: s_web::RequestCtx| async move {
+        match ctx.body_string().await {
             Ok(Some(body)) => {
                 // Simple form parsing (in real app, use a proper form parser)
                 let params: std::collections::HashMap<&str, &str> = body

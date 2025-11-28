@@ -313,9 +313,9 @@ impl Engine {
                     let router = router.clone();
                     let global_middlewares = global_middlewares.clone();
                     let groups = groups.clone();
-
-                    tokio::task::spawn(async move {
-                        let service = service_fn(move |req| {
+                    
+                    let conn = http1::Builder::new()
+                        .serve_connection(io, service_fn(move |req| {
                             let router = router.clone();
                             let global_middlewares = global_middlewares.clone();
                             let groups = groups.clone();
@@ -374,12 +374,11 @@ impl Engine {
 
                                 Ok::<_, Infallible>(response)
                             }
-                        });
+                        }));
 
-                        if let Err(err) = http1::Builder::new()
-                            .serve_connection(io, service)
-                            .await
-                        {
+                    let fut = graceful.watch(conn);
+                    tokio::spawn(async move {
+                        if let Err(err) = fut.await {
                             eprintln!("Connection error {remote_addr}: {err:?}");
                         }
                     });

@@ -1,0 +1,11 @@
+[package]
+name = "example_seaorm_sqlite_crud"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+s_web   = { path = "../../core" }
+tokio   = { workspace = true }
+serde   = { workspace = true }
+serde_json = { workspace = true }
+sea-orm = { version = "2.0.0-rc.36", features = ["sqlx-sqlite", "runtime-tokio-native-tls", "macros"] }

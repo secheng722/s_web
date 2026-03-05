@@ -30,28 +30,31 @@ where
     }
 }
 
-/// Execute a chain of middlewares
-pub async fn execute_chain(middlewares: &[Middleware], endpoint: Next, ctx: RequestCtx) -> Response {
-    if middlewares.is_empty() {
-        return endpoint(ctx).await;
-    }
-    
-    let (first, rest) = middlewares.split_first().unwrap();
-    let next = create_next(rest, endpoint);
-    first(ctx, next).await
+/// Execute a middleware chain.
+///
+/// Takes an `Arc<Vec<Middleware>>` so inner `Next` closures can hold a cheap `Arc` clone
+/// (reference-count bump) instead of a deep `Vec` clone per middleware layer.
+pub async fn execute_chain(middlewares: Arc<Vec<Middleware>>, endpoint: Next, ctx: RequestCtx) -> Response {
+    execute_at(middlewares, 0, endpoint, ctx).await
 }
 
-/// Create the next middleware function
-fn create_next(remaining: &[Middleware], endpoint: Next) -> Next {
-    let middlewares = remaining.to_vec();
-    let endpoint = endpoint.clone();
-    
-    Arc::new(move |ctx| {
-        let middlewares = middlewares.clone();
-        let endpoint = endpoint.clone();
-        
-        Box::pin(async move {
-            execute_chain(&middlewares, endpoint, ctx).await
-        })
+/// Recursive index-based executor — no Vec allocation per layer.
+fn execute_at(
+    middlewares: Arc<Vec<Middleware>>,
+    index: usize,
+    endpoint: Next,
+    ctx: RequestCtx,
+) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+    Box::pin(async move {
+        if index >= middlewares.len() {
+            return endpoint(ctx).await;
+        }
+        let mw = middlewares[index].clone();
+        let next: Next = Arc::new(move |ctx| {
+            let mws = middlewares.clone();   // cheap Arc clone, not Vec clone
+            let ep = endpoint.clone();
+            execute_at(mws, index + 1, ep, ctx)
+        });
+        mw(ctx, next).await
     })
 }

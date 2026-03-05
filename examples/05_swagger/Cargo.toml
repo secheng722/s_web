@@ -1,0 +1,10 @@
+[package]
+name = "example_swagger"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+s_web      = { path = "../../core" }
+tokio      = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }

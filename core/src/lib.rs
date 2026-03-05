@@ -16,7 +16,7 @@ mod trie;
 // =============================================================================
 
 // These are used internally by the framework
-use middleware::{execute_chain, Middleware};
+pub(crate) use middleware::{execute_chain, Middleware};
 use router::Router;
 // =============================================================================
 // Public API Exports

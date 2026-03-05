@@ -1,296 +1,205 @@
-# s_web HTTP Framework
+# s_web
 
 📖 **中文文档**: [README_CN.md](README_CN.md)
 
-🚀 A modern, simple and efficient Rust HTTP framework built on Hyper, featuring **zero-cost functional middleware**, **elegant development experience**, and **comprehensive API documentation**.
-
-## ✨ Features
-
-- **🎯 Unified API Design**: Direct return support for various types with automatic conversion
-- **🔄 Automatic Type Conversion**: Return String, JSON, Result, Option, tuples directly
-- **⚡ High Performance**: Built on Hyper with zero-cost abstractions
-- **🧩 Functional Middleware System**: Elegant parameter-passing middleware with chain calls
-- **📦 Route Groups**: Organize routes with prefixes and group-specific middleware
-- **� Chain Calls**: Support chain calls for both middleware and routing
-- **�🔒 Type Safety**: Compile-time guarantees for request/response handling
-- **� Body Handling**: Easy POST/PUT request body parsing (JSON, text, bytes, form)
-- **🛑 Lifecycle Management**: Startup and shutdown hooks for resource management
-- **📖 Swagger Integration**: Built-in Swagger UI with custom documentation support
-
-## 🚀 Quick Start
-
-### Add Dependencies
+A modern, lightweight Rust HTTP framework built on top of [Hyper](https://github.com/hyperium/hyper).  
+Designed around plain async functions — no macros, no boilerplate, no magic.
 
 ```toml
 [dependencies]
-s_web = { git = "https://github.com/secheng722/s_web" }
-tokio = { version = "1.45.1", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+s_web  = { git = "https://github.com/secheng722/s_web" }
+tokio  = { version = "1", features = ["full"] }
+serde_json = "1"
 ```
 
-### Basic Usage
+---
+
+## Features
+
+| | |
+|---|---|
+| **Zero-boilerplate handlers** | Return `&str`, `String`, `serde_json::Value`, `(StatusCode, T)`, `Result`, `Option` directly |
+| **Functional middleware** | Plain `async fn(ctx, next) -> Response` — no traits, no wrappers |
+| **Route groups** | Prefix-scoped groups with per-group middleware |
+| **Lifecycle hooks** | `on_startup` / `on_shutdown` for resource init & cleanup |
+| **Swagger UI** | Built-in `/docs/` UI with `swagger()` builder for documentation |
+| **Graceful shutdown** | Ctrl-C signal handling with configurable drain timeout |
+
+---
+
+## Quick Start
 
 ```rust
-use s_web::Engine;
+use s_web::{Engine, RequestCtx};
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Engine::new();
-    
-    // Direct return types - automatic conversion
-    app.get("/text", |_| async { "Hello, World!" });
-    app.get("/json", |_| async { 
-        json!({"message": "Hello JSON", "framework": "s_web"})
+
+    app.get("/",           |_: RequestCtx| async { "Hello, World!" });
+    app.get("/hello/:name", |ctx: RequestCtx| async move {
+        format!("Hello, {}!", ctx.get_param("name").map(|s| s.as_str()).unwrap_or("stranger"))
     });
-    
-    // Path parameters
-    app.get("/greet/:name", |ctx| async move {
-        let name = ctx.get_param("name").unwrap_or("Guest");
-        format!("Hello, {}!", name)
+    app.get("/json", |_: RequestCtx| async {
+        json!({ "framework": "s_web", "status": "ok" })
     });
-    
-    // Result handling - Ok -> 200, Err -> 500
-    app.get("/result", |_| async {
-        let result: Result<&str, &str> = Ok("Success!");
-        result
-    });
-    
-    // Option handling - Some -> 200, None -> 404
-    app.get("/option", |_| async {
-        let data: Option<&str> = Some("Found!");
-        data
-    });
-    
-    // Custom status codes
-    app.post("/create", |_| async {
-        (s_web::StatusCode::CREATED, json!({"id": 123}))
-    });
-    
-    app.run("127.0.0.1:8080").await
-}
-```
 
-## 🔗 Chain Calls & Middleware
-
-s_web supports elegant chain calls for both routing and middleware:
-
-```rust
-use s_web::{Engine, RequestCtx, Next, Response, IntoResponse};
-use serde_json::json;
-
-// Middleware functions with parameters
-async fn logger(prefix: &'static str, ctx: RequestCtx, next: Next) -> Response {
-    println!("[{}] {} {}", prefix, ctx.request.method(), ctx.request.uri().path());
-    let start = std::time::Instant::now();
-    let response = next(ctx).await;
-    println!("[{}] Response: {} ({}ms)", prefix, response.status(), start.elapsed().as_millis());
-    response
-}
-
-async fn auth(token: &'static str, ctx: RequestCtx, next: Next) -> Response {
-    if let Some(auth) = ctx.request.headers().get("Authorization") {
-        if auth.to_str().unwrap_or("") == format!("Bearer {token}") {
-            return next(ctx).await;
-        }
-    }
-    (s_web::StatusCode::UNAUTHORIZED, json!({"error": "Unauthorized"})).into_response()
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut app = Engine::new();
-    
-    // Global middleware with chain calls
-    app.use_middleware(|ctx, next| logger("Global", ctx, next))
-       .get("/", |_| async { "Welcome!" })
-       .get("/health", |_| async { json!({"status": "ok"}) });
-    
-    // API group with chained middleware and routes
-    {
-        let api = app.group("/api");
-        api.use_middleware(|ctx, next| logger("API", ctx, next))
-           .use_middleware(|ctx, next| auth("api-token", ctx, next))
-           .get("/users", |_| async { json!(["alice", "bob"]) })
-           .post("/users", |_| async { json!({"message": "User created"}) })
-           .get("/profile", |_| async { json!({"name": "Current User"}) });
-    }
-    
-    app.run("127.0.0.1:8080").await
-}
-```
-
-## 📮 Request Body Handling
-
-Easy POST/PUT request body parsing:
-
-```rust
-app.post("/json", |ctx: s_web::RequestCtx| async move {
-    match ctx.body_json::<serde_json::Value>() {
-        Ok(Some(json)) => format!("Received: {}", json),
-        Ok(None) => "No body provided".to_string(),
-        Err(e) => format!("Parse error: {}", e),
-    }
-});
-
-app.post("/text", |ctx: s_web::RequestCtx| async move {
-    match ctx.body_string() {
-        Ok(Some(text)) => format!("Text: {}", text),
-        Ok(None) => "No body".to_string(),
-        Err(e) => format!("Error: {}", e),
-    }
-});
-
-app.post("/bytes", |ctx: s_web::RequestCtx| async move {
-    match ctx.body_bytes() {
-        Some(bytes) => format!("Received {} bytes", bytes.len()),
-        None => "No body".to_string(),
-    }
-});
-```
-
-## 🛑 Lifecycle Management
-
-Built-in startup and shutdown hooks:
-
-```rust
-use s_web::Engine;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Engine::new()
-        .on_startup(|| async {
-            println!("🚀 Initializing database...");
-            // Initialize database, cache, etc.
-        })
-        .on_startup(|| async {
-            println!("🔥 Warming up system...");
-            // Additional startup tasks
-        })
-        .on_shutdown(|| async {
-            println!("🛑 Cleaning up resources...");
-            // Cleanup database connections, etc.
-        })
-        .on_shutdown(|| async {
-            println!("✅ Shutdown complete");
-            // Final cleanup
-        });
-    
-    let mut app = app;
-    app.get("/", |_| async { "Hello!" });
-    
-    app.run("127.0.0.1:8080").await
-}
-```
-
-## 📖 Swagger Documentation
-
-Built-in Swagger UI with custom documentation support:
-
-```rust
-use s_web::{Engine, swagger};
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut app = Engine::new();
-    
-    // Auto-generated documentation
-    app.get("/users", get_users);
-    
-    // Custom Swagger documentation
-    app.post_with_swagger(
-        "/users",
-        create_user,
-        swagger()
-            .summary("Create a new user")
-            .description("Creates a new user with the provided data")
-            .tag("Users")
-            .request_body(json!({"name": "John", "email": "john@example.com"}))
-            .json_response("201", "User created", Some(json!({"id": 1, "name": "John"})))
-            .build()
-    );
-    
-    // Swagger UI available at: http://127.0.0.1:3000/swagger-ui
-    // OpenAPI JSON at: http://127.0.0.1:3000/api-docs
-    
     app.run("127.0.0.1:3000").await
 }
 ```
 
-## 🎯 Advanced Usage
+---
 
-### Custom Response Builder
+## Middleware
 
-For precise control over HTTP responses:
-
-```rust
-use s_web::ResponseBuilder;
-
-app.get("/custom", |_| async {
-    ResponseBuilder::new()
-        .status(s_web::StatusCode::OK)
-        .content_type("application/json; charset=utf-8")
-        .header("X-Custom-Header", "s_web-Framework")
-        .body(r#"{"message": "Custom response"}"#)
-});
-
-app.get("/html", |_| async {
-    ResponseBuilder::html(r#"
-        <h1>Hello from s_web!</h1>
-        <p>This is an HTML response</p>
-    "#)
-});
-```
-
-### Route Groups with Nested Middleware
+Middleware is a plain async function — capture whatever you need via closures:
 
 ```rust
-// Admin routes with authentication
-{
-    let admin = app.group("/admin");
-    admin.use_middleware(|ctx, next| auth("admin-token", ctx, next))
-         .get("/dashboard", |_| async { "Admin Dashboard" })
-         .delete("/users/:id", |ctx| async move {
-             let id = ctx.get_param("id").unwrap_or("0");
-             format!("Deleted user {}", id)
-         });
+use s_web::{Engine, Next, RequestCtx, Response};
+use std::time::Instant;
+
+async fn logging(ctx: RequestCtx, next: Next) -> Response {
+    let path  = ctx.request.uri().path().to_owned();
+    let start = Instant::now();
+    let resp  = next(ctx).await;
+    println!("{} → {} ({:.1}ms)", path, resp.status(), start.elapsed().as_secs_f64() * 1000.0);
+    resp
+}
+
+async fn require_api_key(ctx: RequestCtx, next: Next) -> Response {
+    use s_web::{IntoResponse, StatusCode};
+    use serde_json::json;
+    match ctx.header("x-api-key") {
+        Some(k) if k == "secret" => next(ctx).await,
+        _ => (StatusCode::UNAUTHORIZED, json!({ "error": "invalid API key" })).into_response(),
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = Engine::new();
+
+    // Global middleware
+    app.use_middleware(logging);
+
+    // Route group with its own middleware
+    {
+        let api = app.group("/api/v1");
+        api.use_middleware(require_api_key);
+        api.get("/users", |_: RequestCtx| async { serde_json::json!(["alice", "bob"]) });
+    }
+
+    app.run("127.0.0.1:3000").await
 }
 ```
 
-## 📋 Examples
+---
 
-The repository includes comprehensive examples:
+## Route Groups
 
-- **`api_example`**: Unified API design showcasing automatic type conversion
-- **`chain_example`**: Chain calls for middleware and routing
-- **`lifecycle_example`**: Startup/shutdown hooks and resource management
-- **`swagger_custom_example`**: Custom Swagger documentation
-- **`middleware_example`**: Advanced middleware patterns
-- **`database_example`**: Database integration
-- **`upload_example`**: File upload handling
-
-## 🚦 Testing
-
-Test with curl:
-
-```bash
-# JSON body
-curl -X POST http://127.0.0.1:8080/api/users \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer api-token" \
-     -d '{"name": "Alice", "email": "alice@example.com"}'
-
-# Form data
-curl -X POST http://127.0.0.1:8080/form \
-     -d "name=Alice&email=alice@example.com"
-
-# File upload
-curl -X POST http://127.0.0.1:8080/upload \
-     -F "file=@example.txt"
+```rust
+{
+    let admin = app.group("/admin");
+    admin.use_middleware(require_api_key);
+    admin.get("/dashboard", |_: RequestCtx| async { "Dashboard" });
+    admin.delete("/users/:id", |ctx: RequestCtx| async move {
+        format!("deleted {}", ctx.get_param("id").unwrap())
+    });
+}
 ```
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Request Body
+
+```rust
+// JSON
+app.post("/users", |mut ctx: RequestCtx| async move {
+    #[derive(serde::Deserialize)]
+    struct Payload { name: String }
+
+    let p: Payload = ctx.json().await?;
+    Ok::<_, Box<dyn std::error::Error + Send + Sync>>(format!("Hello, {}", p.name))
+});
+
+// Query params
+app.get("/search", |ctx: RequestCtx| async move {
+    let q = ctx.query_param("q").unwrap_or_default();
+    format!("search: {q}")
+});
+```
+
+---
+
+## Lifecycle Hooks
+
+```rust
+let app = Engine::new()
+    .on_startup(|| async { println!("DB connected") })
+    .on_shutdown(|| async { println!("DB closed") });
+```
+
+---
+
+## Swagger UI
+
+```rust
+use s_web::{Engine, RequestCtx, swagger};
+use serde_json::json;
+
+let mut app = Engine::new();
+app.enable_swagger();   // mounts /docs/ and /docs/swagger.json
+
+app.get_with_swagger(
+    "/users",
+    |_: RequestCtx| async { json!([]) },
+    swagger()
+        .summary("List users")
+        .tag("Users")
+        .json_response("200", "User list", Some(json!([])))
+        .build(),
+);
+// Open http://127.0.0.1:3000/docs/
+```
+
+---
+
+## Custom Responses
+
+```rust
+use s_web::{ResponseBuilder, StatusCode};
+
+// HTML
+ResponseBuilder::html("<h1>Hello</h1>");
+
+// Full control
+ResponseBuilder::new()
+    .status(StatusCode::CREATED)
+    .content_type("application/json; charset=utf-8")
+    .header("X-Request-Id", "abc123")
+    .body(r#"{"id":1}"#);
+```
+
+---
+
+## Examples
+
+Seven runnable projects, each a self-contained Cargo package — copy any one out and use it standalone.
+
+| # | Directory | Topics | Run |
+|---|-----------|--------|-----|
+| 1 | [01_hello_world](examples/01_hello_world) | Routes, path params, HTML | `cargo run -p example_hello_world` |
+| 2 | [02_json_api](examples/02_json_api) | JSON, query params, POST body | `cargo run -p example_json_api` |
+| 3 | [03_middleware](examples/03_middleware) | Global & group middleware, auth | `cargo run -p example_middleware` |
+| 4 | [04_todo_app](examples/04_todo_app) | Shared state, full CRUD, lifecycle hooks | `cargo run -p example_todo_app` |
+| 5 | [05_swagger](examples/05_swagger) | Swagger UI, bearer auth docs | `cargo run -p example_swagger` |
+| 6 | [06_sqlx_sqlite_crud](examples/06_sqlx_sqlite_crud) | sqlx + SQLite, connection pool | `cargo run -p example_sqlx_sqlite_crud` |
+| 7 | [07_seaorm_sqlite_crud](examples/07_seaorm_sqlite_crud) | SeaORM entity, auto migration | `cargo run -p example_seaorm_sqlite_crud` |
+
+---
+
+## Contributing
+
+Pull requests are welcome.
+

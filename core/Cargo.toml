@@ -26,6 +26,6 @@ hyper = { workspace = true }
 tokio = { workspace = true }
 http-body-util = { workspace = true }
 hyper-util = { workspace = true }
-async-trait = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
+form_urlencoded = { workspace = true }

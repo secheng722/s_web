@@ -299,7 +299,11 @@ pub fn generate_enhanced_swagger_json(
         "paths": paths
     });
 
-    serde_json::to_string_pretty(&swagger_doc).unwrap()
+    serde_json::to_string_pretty(&swagger_doc)
+        .unwrap_or_else(|e| {
+            eprintln!("[s_web] swagger serialization error: {e}");
+            String::from("{}")
+        })
 }
 
 /// Convert s_web path format to OpenAPI format
@@ -366,12 +370,12 @@ fn create_operation_from_custom(custom: &SwaggerInfo, path: &str) -> Value {
     }
 
     if !parameters.is_empty() {
-        operation["parameters"] = serde_json::to_value(parameters).unwrap();
+        operation["parameters"] = serde_json::to_value(parameters).unwrap_or(json!([]));
     }
 
     // Add responses
     if !custom.responses.is_empty() {
-        operation["responses"] = serde_json::to_value(&custom.responses).unwrap();
+        operation["responses"] = serde_json::to_value(&custom.responses).unwrap_or(json!({}));
     } else {
         operation["responses"] = json!({
             "200": {
@@ -382,7 +386,7 @@ fn create_operation_from_custom(custom: &SwaggerInfo, path: &str) -> Value {
 
     // Add request body
     if let Some(request_body) = &custom.request_body {
-        operation["requestBody"] = serde_json::to_value(request_body).unwrap();
+        operation["requestBody"] = serde_json::to_value(request_body).unwrap_or(json!({}));
     }
 
     // Add security

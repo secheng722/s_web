@@ -9,7 +9,7 @@ use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 
 use crate::{
     Handler, Middleware, Next, RequestCtx, Response, Router, execute_chain, middleware::IntoNext,
-    response::IntoResponse, swagger::SwaggerInfo,
+    swagger::SwaggerInfo,
 };
 
 /// Type alias for lifecycle hooks
@@ -91,6 +91,8 @@ pub struct Engine {
     startup_hooks: Vec<LifecycleHook>,
     shutdown_hooks: Vec<LifecycleHook>,
     swagger_info: HashMap<String, SwaggerInfo>,
+    /// Whether to expose Swagger UI at /docs/
+    swagger_enabled: bool,
 }
 
 impl Engine {
@@ -103,7 +105,14 @@ impl Engine {
             startup_hooks: Vec::new(),
             shutdown_hooks: Vec::new(),
             swagger_info: HashMap::new(),
+            swagger_enabled: false,
         }
+    }
+
+    /// Enable the built-in Swagger UI at `/docs/` and `/docs/swagger.json`.
+    pub fn enable_swagger(&mut self) -> &mut Self {
+        self.swagger_enabled = true;
+        self
     }
 
     /// Add global middleware
@@ -148,11 +157,13 @@ impl Engine {
         self
     }
 
-    /// Create a route group with the given prefix
+    /// Create (or retrieve) a route group with the given prefix.
+    /// Calling `group()` with the same prefix twice returns the existing group
+    /// rather than silently discarding previously registered routes.
     pub fn group(&mut self, prefix: &str) -> &mut RouterGroup {
-        let group = RouterGroup::new(prefix.to_string());
-        self.groups.insert(prefix.to_string(), group);
-        self.groups.get_mut(prefix).unwrap()
+        self.groups
+            .entry(prefix.to_string())
+            .or_insert_with(|| RouterGroup::new(prefix.to_string()))
     }
 
     /// Add a route to the main router
@@ -283,9 +294,11 @@ impl Engine {
         println!("🚀 Server running on http://{addr}");
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
-        // Add swagger endpoints automatically
-        self.add_swagger_endpoints();
-        println!("📖 Swagger UI available at http://{addr}/docs/");
+        // Add swagger endpoints only when explicitly enabled
+        if self.swagger_enabled {
+            self.add_swagger_endpoints();
+            println!("📖 Swagger UI available at http://{addr}/docs/");
+        }
 
         let global_middlewares = Arc::new(self.middlewares);
         
@@ -327,18 +340,20 @@ impl Engine {
                             let groups = groups.clone();
 
                             async move {
-                                let path = req.uri().path();
+                                let path = req.uri().path().to_owned();
 
-                                // Fast path matching for groups
+                                // Prefix matching with boundary check:
+                                // "/user" must not match "/users" — verify next char is '/' or end.
                                 let matched_group = groups
                                     .iter()
-                                    .find(|(prefix, _, _)| path.starts_with(prefix))
+                                    .find(|(prefix, _, _)| {
+                                        path.starts_with(prefix.as_str())
+                                            && (path.len() == prefix.len()
+                                                || path.as_bytes().get(prefix.len()) == Some(&b'/'))
+                                    })
                                     .map(|(_, group, middlewares)| (group.clone(), middlewares.clone()));
 
-                                let Ok(ctx) = RequestCtx::new(req).await else {
-                                    eprintln!("Request context error");
-                                    return Ok("Bad Request".into_response());
-                                };
+                                let ctx = RequestCtx::new(req).with_remote_addr(remote_addr);
 
                                 let response = if let Some((group, combined_middlewares)) = matched_group {
                                     // Group request handling
@@ -352,7 +367,7 @@ impl Engine {
                                             async move { group.handle_request(ctx).await }
                                         }).into_next();
 
-                                        execute_chain(&combined_middlewares, endpoint, ctx).await
+                                        execute_chain(combined_middlewares, endpoint, ctx).await
                                     }
                                 } else {
                                     // Main router handling
@@ -366,7 +381,7 @@ impl Engine {
                                             async move { router.handle_request(ctx).await }
                                         }).into_next();
 
-                                        execute_chain(&global_middlewares, endpoint, ctx).await
+                                        execute_chain(global_middlewares, endpoint, ctx).await
                                     }
                                 };
 

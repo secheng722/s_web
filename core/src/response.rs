@@ -54,12 +54,22 @@ impl ResponseBuilder {
 
     /// Build response with body
     pub fn body<T: Into<Bytes>>(self, body: T) -> Response {
-        self.builder.body(full(body)).unwrap()
+        self.builder.body(full(body)).unwrap_or_else(|_| {
+            hyper::Response::builder()
+                .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+                .body(full("500 Internal Server Error"))
+                .expect("static fallback response is always valid")
+        })
     }
 
     /// Build response with empty body
     pub fn empty_body(self) -> Response {
-        self.builder.body(empty()).unwrap()
+        self.builder.body(empty()).unwrap_or_else(|_| {
+            hyper::Response::builder()
+                .status(hyper::StatusCode::NO_CONTENT)
+                .body(empty())
+                .expect("static fallback response is always valid")
+        })
     }
 
     /// Build an HTML response
@@ -191,15 +201,16 @@ impl IntoResponse for () {
 impl<T, E> IntoResponse for Result<T, E>
 where
     T: IntoResponse,
-    E: std::fmt::Display,
+    E: std::fmt::Debug,
 {
     fn into_response(self) -> Response {
         match self {
             Ok(value) => value.into_response(),
-            Err(err) => ResponseBuilder::new()
-                .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-                .content_type("text/plain; charset=utf-8")
-                .body(format!("Error: {err}")),
+            Err(err) => {
+                // Log internally but never expose raw error details to clients
+                eprintln!("[s_web] handler error: {:?}", err);
+                ResponseBuilder::internal_error()
+            }
         }
     }
 }

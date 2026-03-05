@@ -60,6 +60,16 @@ impl<T> Node<T> {
 
     pub fn insert(&mut self, pattern: &str, parts: &[&str], height: usize, handler: T) {
         if height == parts.len() {
+            // Warn on route conflict (e.g. registering the same pattern twice,
+            // or two dynamic patterns that share the same structure like /:a and /:b).
+            if !self.pattern.is_empty() && self.pattern != pattern {
+                eprintln!(
+                    "[s_web] route conflict: \"{}\" overwrites \"{}\"",
+                    pattern, self.pattern
+                );
+            } else if self.value.is_some() {
+                eprintln!("[s_web] route conflict: \"{}\" registered more than once", pattern);
+            }
             self.pattern = pattern.to_string();
             self.value = Some(handler);
             self.params = parts

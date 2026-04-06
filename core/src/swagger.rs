@@ -21,7 +21,7 @@ pub struct SwaggerInfo {
 pub struct Parameter {
     pub name: String,
     #[serde(rename = "in")]
-    pub in_: String, // "path", "query", "header", "cookie"
+    pub in_: String,
     pub description: Option<String>,
     pub required: bool,
     pub schema: Schema,
@@ -60,6 +60,28 @@ pub struct Schema {
     pub items: Option<Box<Schema>>,
 }
 
+impl Schema {
+    pub fn string() -> Self {
+        Self {
+            type_: "string".to_string(),
+            format: None,
+            example: None,
+            properties: None,
+            items: None,
+        }
+    }
+
+    pub fn object() -> Self {
+        Self {
+            type_: "object".to_string(),
+            format: None,
+            example: None,
+            properties: None,
+            items: None,
+        }
+    }
+}
+
 /// Security requirement
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityRequirement {
@@ -73,32 +95,27 @@ pub struct SwaggerBuilder {
 }
 
 impl SwaggerBuilder {
-    /// Create a new SwaggerBuilder
     pub fn new() -> Self {
         Self {
             info: SwaggerInfo::default(),
         }
     }
 
-    /// Set summary
     pub fn summary<S: Into<String>>(mut self, summary: S) -> Self {
         self.info.summary = Some(summary.into());
         self
     }
 
-    /// Set description
     pub fn description<S: Into<String>>(mut self, description: S) -> Self {
         self.info.description = Some(description.into());
         self
     }
 
-    /// Add a tag
     pub fn tag<S: Into<String>>(mut self, tag: S) -> Self {
         self.info.tags.push(tag.into());
         self
     }
 
-    /// Add a parameter
     pub fn parameter<S: Into<String>, T: Into<String>>(
         mut self,
         name: S,
@@ -111,28 +128,19 @@ impl SwaggerBuilder {
             in_: in_.into(),
             description,
             required,
-            schema: Schema {
-                type_: "string".to_string(),
-                format: None,
-                example: None,
-                properties: None,
-                items: None,
-            },
+            schema: Schema::string(),
         });
         self
     }
 
-    /// Add a path parameter (convenience method)
     pub fn path_param<S: Into<String>>(self, name: S, description: S) -> Self {
         self.parameter(name, "path", Some(description.into()), true)
     }
 
-    /// Add a query parameter (convenience method)
     pub fn query_param<S: Into<String>>(self, name: S, description: S, required: bool) -> Self {
         self.parameter(name, "query", Some(description.into()), required)
     }
 
-    /// Add a response
     pub fn response<S: Into<String>>(mut self, status: S, description: S) -> Self {
         self.info.responses.insert(
             status.into(),
@@ -144,7 +152,6 @@ impl SwaggerBuilder {
         self
     }
 
-    /// Add a JSON response with example
     pub fn json_response<S: Into<String>>(
         mut self,
         status: S,
@@ -155,14 +162,8 @@ impl SwaggerBuilder {
         content.insert(
             "application/json".to_string(),
             MediaType {
-                schema: Schema {
-                    type_: "object".to_string(),
-                    format: None,
-                    example: example.clone(),
-                    properties: None,
-                    items: None,
-                },
-                example,
+                schema: Schema::object(),
+                example: example.clone(),
             },
         );
 
@@ -176,20 +177,13 @@ impl SwaggerBuilder {
         self
     }
 
-    /// Set request body
     pub fn request_body(mut self, example: Value) -> Self {
         let mut content = HashMap::new();
         content.insert(
             "application/json".to_string(),
             MediaType {
-                schema: Schema {
-                    type_: "object".to_string(),
-                    format: None,
-                    example: Some(example.clone()),
-                    properties: None,
-                    items: None,
-                },
-                example: Some(example),
+                schema: Schema::object(),
+                example: Some(example.clone()),
             },
         );
 
@@ -201,7 +195,6 @@ impl SwaggerBuilder {
         self
     }
 
-    /// Add security requirement
     pub fn security<S: Into<String>>(mut self, name: S, scopes: Vec<String>) -> Self {
         self.info.security.push(SecurityRequirement {
             name: name.into(),
@@ -210,7 +203,6 @@ impl SwaggerBuilder {
         self
     }
 
-    /// Add bearer token authentication (convenience method)
     pub fn bearer_auth(mut self) -> Self {
         self.info.security.push(SecurityRequirement {
             name: "bearerAuth".to_string(),
@@ -219,13 +211,11 @@ impl SwaggerBuilder {
         self.response("401", "Unauthorized - Bearer token required")
     }
 
-    /// Add common success responses (convenience method)
     pub fn success_responses(self) -> Self {
         self.response("200", "Success")
             .response("500", "Internal Server Error")
     }
 
-    /// Add common CRUD responses (convenience method)
     pub fn crud_responses(self) -> Self {
         self.response("200", "Success")
             .response("400", "Bad Request")
@@ -234,7 +224,6 @@ impl SwaggerBuilder {
             .response("500", "Internal Server Error")
     }
 
-    /// Build the final SwaggerInfo
     pub fn build(self) -> SwaggerInfo {
         self.info
     }
@@ -246,7 +235,6 @@ impl Default for SwaggerBuilder {
     }
 }
 
-/// Convenience function to create a new SwaggerBuilder
 pub fn swagger() -> SwaggerBuilder {
     SwaggerBuilder::new()
 }
@@ -259,7 +247,6 @@ pub fn generate_enhanced_swagger_json(
     let mut paths = serde_json::Map::new();
 
     for (method, path) in routes {
-        // Convert s_web path format (:id) to OpenAPI format ({id})
         let openapi_path = convert_path_format(path);
         let route_key = format!("{}-{}", method.to_uppercase(), path);
 
@@ -269,10 +256,8 @@ pub fn generate_enhanced_swagger_json(
 
         if let Some(path_obj) = path_item.as_object_mut() {
             let operation = if let Some(custom) = custom_info.get(&route_key) {
-                // Use custom swagger info
                 create_operation_from_custom(custom, path)
             } else {
-                // Use default swagger info
                 create_default_operation(method, path)
             };
 
@@ -299,14 +284,12 @@ pub fn generate_enhanced_swagger_json(
         "paths": paths
     });
 
-    serde_json::to_string_pretty(&swagger_doc)
-        .unwrap_or_else(|e| {
-            eprintln!("[s_web] swagger serialization error: {e}");
-            String::from("{}")
-        })
+    serde_json::to_string_pretty(&swagger_doc).unwrap_or_else(|e| {
+        eprintln!("[s_web] swagger serialization error: {e}");
+        String::from("{}")
+    })
 }
 
-/// Convert s_web path format to OpenAPI format
 fn convert_path_format(path: &str) -> String {
     path.split('/')
         .map(|part| {
@@ -322,7 +305,36 @@ fn convert_path_format(path: &str) -> String {
         .join("/")
 }
 
-/// Create operation from custom swagger info
+/// Extract path parameters from a route pattern
+fn extract_path_params(path: &str) -> Vec<(&str, bool)> {
+    path.split('/')
+        .filter_map(|part| {
+            if let Some(name) = part.strip_prefix(':') {
+                Some((name, false))
+            } else if let Some(name) = part.strip_prefix('*') {
+                Some((name, true))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn string_param_json(name: &str, is_wildcard: bool) -> Value {
+    let desc = if is_wildcard {
+        format!("The {} wildcard parameter", name)
+    } else {
+        format!("The {} parameter", name)
+    };
+    json!({
+        "name": name,
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": desc
+    })
+}
+
 fn create_operation_from_custom(custom: &SwaggerInfo, path: &str) -> Value {
     let mut operation = json!({
         "summary": custom.summary,
@@ -330,75 +342,42 @@ fn create_operation_from_custom(custom: &SwaggerInfo, path: &str) -> Value {
         "tags": custom.tags,
     });
 
-    // Add parameters
     let mut parameters = custom.parameters.clone();
-    
-    // Auto-detect path parameters if not explicitly defined
-    for part in path.split('/') {
-        if let Some(param_name) = part.strip_prefix(':') {
-            if !parameters.iter().any(|p| p.name == param_name) {
-                parameters.push(Parameter {
-                    name: param_name.to_string(),
-                    in_: "path".to_string(),
-                    description: Some(format!("The {} parameter", param_name)),
-                    required: true,
-                    schema: Schema {
-                        type_: "string".to_string(),
-                        format: None,
-                        example: None,
-                        properties: None,
-                        items: None,
-                    },
-                });
-            }
-        } else if let Some(param_name) = part.strip_prefix('*')
-            && !parameters.iter().any(|p| p.name == param_name) {
-                parameters.push(Parameter {
-                    name: param_name.to_string(),
-                    in_: "path".to_string(),
-                    description: Some(format!("The {} wildcard parameter", param_name)),
-                    required: true,
-                    schema: Schema {
-                        type_: "string".to_string(),
-                        format: None,
-                        example: None,
-                        properties: None,
-                        items: None,
-                    },
-                });
-            }
+    for (name, is_wildcard) in extract_path_params(path) {
+        if !parameters.iter().any(|p| p.name == name) {
+            parameters.push(Parameter {
+                name: name.to_string(),
+                in_: "path".to_string(),
+                description: Some(if is_wildcard {
+                    format!("The {} wildcard parameter", name)
+                } else {
+                    format!("The {} parameter", name)
+                }),
+                required: true,
+                schema: Schema::string(),
+            });
+        }
     }
 
     if !parameters.is_empty() {
         operation["parameters"] = serde_json::to_value(parameters).unwrap_or(json!([]));
     }
 
-    // Add responses
     if !custom.responses.is_empty() {
         operation["responses"] = serde_json::to_value(&custom.responses).unwrap_or(json!({}));
     } else {
-        operation["responses"] = json!({
-            "200": {
-                "description": "Success"
-            }
-        });
+        operation["responses"] = json!({ "200": { "description": "Success" } });
     }
 
-    // Add request body
     if let Some(request_body) = &custom.request_body {
         operation["requestBody"] = serde_json::to_value(request_body).unwrap_or(json!({}));
     }
 
-    // Add security
     if !custom.security.is_empty() {
         let security_array: Vec<Value> = custom
             .security
             .iter()
-            .map(|req| {
-                json!({
-                    req.name.clone(): req.scopes
-                })
-            })
+            .map(|req| json!({ req.name.clone(): req.scopes }))
             .collect();
         operation["security"] = json!(security_array);
     }
@@ -406,56 +385,29 @@ fn create_operation_from_custom(custom: &SwaggerInfo, path: &str) -> Value {
     operation
 }
 
-/// Create default operation
 fn create_default_operation(method: &str, path: &str) -> Value {
     let mut operation = json!({
         "summary": format!("{} {}", method, path),
         "responses": {
-            "200": {
-                "description": "Success"
-            }
+            "200": { "description": "Success" }
         }
     });
 
-    // Extract path parameters
-    let mut parameters = Vec::new();
-    for part in path.split('/') {
-        if let Some(param_name) = part.strip_prefix(':') {
-            parameters.push(json!({
-                "name": param_name,
-                "in": "path",
-                "required": true,
-                "schema": {
-                    "type": "string"
-                },
-                "description": format!("The {} parameter", param_name)
-            }));
-        } else if let Some(param_name) = part.strip_prefix('*') {
-            parameters.push(json!({
-                "name": param_name,
-                "in": "path",
-                "required": true,
-                "schema": {
-                    "type": "string"
-                },
-                "description": format!("The {} wildcard parameter", param_name)
-            }));
-        }
-    }
+    let parameters: Vec<Value> = extract_path_params(path)
+        .iter()
+        .map(|(name, is_wildcard)| string_param_json(name, *is_wildcard))
+        .collect();
 
     if !parameters.is_empty() {
         operation["parameters"] = json!(parameters);
     }
 
-    // Add request body for POST, PUT, PATCH methods
     if matches!(method, "POST" | "PUT" | "PATCH") {
         operation["requestBody"] = json!({
             "required": true,
             "content": {
                 "application/json": {
-                    "schema": {
-                        "type": "object"
-                    }
+                    "schema": { "type": "object" }
                 }
             }
         });
@@ -464,7 +416,6 @@ fn create_default_operation(method: &str, path: &str) -> Value {
     operation
 }
 
-/// Generate Swagger UI HTML (unchanged)
 pub fn generate_swagger_ui(json_url: &str) -> String {
     format!(
         r#"

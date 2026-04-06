@@ -4,3 +4,4 @@ examples/**/Cargo.lock
 .DS_Store
 .Cargo.lock
 Cargo.lock
+*.db

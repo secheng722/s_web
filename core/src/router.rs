@@ -57,8 +57,7 @@ impl Router {
             return (None, HashMap::new());
         }
         if let Some(node) = root.unwrap().search(&search_parts, 0) {
-            // Use pre-calculated params from the node
-            for (index, name_with_prefix) in &node.params {
+            for (index, name_with_prefix) in node.params() {
                 if let Some(name) = name_with_prefix.strip_prefix(':') {
                     if let Some(part) = search_parts.get(*index) {
                         params.insert(name.to_string(), part.to_string());
@@ -103,7 +102,7 @@ impl Router {
         ctx.params.extend(params);
         let node = node.unwrap();
         
-        if let Some(handler) = &node.value {
+        if let Some(handler) = node.value() {
             handler.handle(ctx).await
         } else {
             ResponseBuilder::not_found()
@@ -146,21 +145,21 @@ mod tests {
     fn test_static_file_route() {
         let mut router = Router::new();
 
-        // 添加静态文件路由
+        // Add static file route
         router.add_route(
             "GET",
             "/static/*filepath",
             Box::new(|_ctx| async { "Static file handler" }),
         );
 
-        // 测试匹配静态文件路径
+        // Test matching static file path
         let (node, params) = router.get_route("GET", "/static/js/app.js");
 
-        // 验证路由节点是否匹配
+        // Verify route node matched
         assert!(node.is_some());
-        assert_eq!(node.unwrap().pattern, "/static/*filepath");
+        assert_eq!(node.unwrap().pattern(), "/static/*filepath");
 
-        // 验证参数是否正确提取
+        // Verify parameters extracted correctly
         assert_eq!(params.get("filepath").unwrap(), "js/app.js");
     }
 }

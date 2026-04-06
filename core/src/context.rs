@@ -94,7 +94,7 @@ impl RequestCtx {
         &mut self,
     ) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
         match self.body_bytes().await? {
-            Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
+            Some(bytes) => Ok(Some(std::str::from_utf8(bytes)?.to_owned())),
             None => Ok(None),
         }
     }

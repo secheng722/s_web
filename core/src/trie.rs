@@ -1,12 +1,12 @@
 //! Trie data structure for efficient route matching.
 
 pub struct Node<T> {
-    pub pattern: String,
-    pub part: String,
-    pub children: Vec<Node<T>>,
-    pub iswild: bool,
-    pub value: Option<T>,
-    pub params: Vec<(usize, String)>,
+    pattern: String,
+    part: String,
+    children: Vec<Node<T>>,
+    iswild: bool,
+    value: Option<T>,
+    params: Vec<(usize, String)>,
 }
 
 impl<T> Default for Node<T> {
@@ -58,6 +58,36 @@ impl<T> Node<T> {
             .collect()
     }
 
+    // --- Getters for encapsulated fields ---
+
+    #[allow(dead_code)]
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+
+    #[allow(dead_code)]
+    pub fn part(&self) -> &str {
+        &self.part
+    }
+
+    #[allow(dead_code)]
+    pub fn iswild(&self) -> bool {
+        self.iswild
+    }
+
+    pub fn value(&self) -> Option<&T> {
+        self.value.as_ref()
+    }
+
+    pub fn params(&self) -> &[(usize, String)] {
+        &self.params
+    }
+
+    #[allow(dead_code)]
+    pub fn children(&self) -> &[Node<T>] {
+        &self.children
+    }
+
     pub fn insert(&mut self, pattern: &str, parts: &[&str], height: usize, handler: T) {
         if height == parts.len() {
             // Warn on route conflict (e.g. registering the same pattern twice,
@@ -68,7 +98,10 @@ impl<T> Node<T> {
                     pattern, self.pattern
                 );
             } else if self.value.is_some() {
-                eprintln!("[s_web] route conflict: \"{}\" registered more than once", pattern);
+                eprintln!(
+                    "[s_web] route conflict: \"{}\" registered more than once",
+                    pattern
+                );
             }
             self.pattern = pattern.to_string();
             self.value = Some(handler);
@@ -143,11 +176,11 @@ mod tests {
         root.insert("/p/:lang/doc", &["p", ":lang", "doc"], 0, ());
 
         assert_eq!(root.children.len(), 1);
-        assert_eq!(root.children[0].part, "p");
-        assert!(!root.children[0].iswild);
-        assert_eq!(root.children[0].children.len(), 1);
-        assert_eq!(root.children[0].children[0].part, ":lang");
-        assert!(root.children[0].children[0].iswild);
+        assert_eq!(root.children()[0].part(), "p");
+        assert!(!root.children()[0].iswild());
+        assert_eq!(root.children()[0].children().len(), 1);
+        assert_eq!(root.children()[0].children()[0].part(), ":lang");
+        assert!(root.children()[0].children()[0].iswild());
     }
 
     #[test]
@@ -157,7 +190,7 @@ mod tests {
 
         let result = root.search(&["p", "rust", "doc"], 0);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().pattern, "/p/:lang/doc");
+        assert_eq!(result.unwrap().pattern(), "/p/:lang/doc");
     }
 
     #[test]

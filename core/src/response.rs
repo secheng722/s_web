@@ -1,6 +1,6 @@
 //! HTTP response utilities and type conversions.
 
-use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
+use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
 use hyper::body::Bytes;
 
 pub type Response = hyper::Response<BoxBody<Bytes, hyper::Error>>;
@@ -114,40 +114,55 @@ pub trait IntoResponse {
     fn into_response(self) -> Response;
 }
 
+// --- Helper constructors to reduce duplication ---
+
+fn text_response(body: impl Into<Bytes>) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .content_type("text/plain; charset=utf-8")
+        .body(body)
+}
+
+fn binary_response(body: impl Into<Bytes>) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .content_type("application/octet-stream")
+        .body(body)
+}
+
+fn json_response(body: String) -> Response {
+    ResponseBuilder::new()
+        .status(hyper::StatusCode::OK)
+        .content_type("application/json; charset=utf-8")
+        .body(body)
+}
+
+// --- Text types ---
+
 impl IntoResponse for &str {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("text/plain; charset=utf-8")
-            .body(self.to_string())
+        text_response(self.to_string())
     }
 }
 
 impl IntoResponse for String {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("text/plain; charset=utf-8")
-            .body(self)
+        text_response(self)
     }
 }
 
 impl IntoResponse for &String {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("text/plain; charset=utf-8")
-            .body(self.clone())
+        text_response(self.clone())
     }
 }
+
+// --- JSON types ---
 
 impl IntoResponse for serde_json::Value {
     fn into_response(self) -> Response {
         match serde_json::to_string(&self) {
-            Ok(json_str) => ResponseBuilder::new()
-                .status(hyper::StatusCode::OK)
-                .content_type("application/json; charset=utf-8")
-                .body(json_str),
+            Ok(json_str) => json_response(json_str),
             Err(_) => ResponseBuilder::internal_error(),
         }
     }
@@ -156,41 +171,39 @@ impl IntoResponse for serde_json::Value {
 impl IntoResponse for &serde_json::Value {
     fn into_response(self) -> Response {
         match serde_json::to_string(self) {
-            Ok(json_str) => ResponseBuilder::new()
-                .status(hyper::StatusCode::OK)
-                .content_type("application/json; charset=utf-8")
-                .body(json_str),
+            Ok(json_str) => json_response(json_str),
             Err(_) => ResponseBuilder::internal_error(),
         }
     }
 }
 
+// --- Binary types ---
+
 impl IntoResponse for Vec<u8> {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("application/octet-stream")
-            .body(self)
+        binary_response(self)
     }
 }
 
 impl IntoResponse for &[u8] {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("application/octet-stream")
-            .body(self.to_vec())
+        binary_response(self.to_vec())
     }
 }
 
 impl IntoResponse for Bytes {
     fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("application/octet-stream")
-            .body(self)
+        binary_response(self)
     }
 }
+
+impl<const N: usize> IntoResponse for [u8; N] {
+    fn into_response(self) -> Response {
+        binary_response(self.to_vec())
+    }
+}
+
+// --- Special types ---
 
 impl IntoResponse for () {
     fn into_response(self) -> Response {
@@ -207,7 +220,6 @@ where
         match self {
             Ok(value) => value.into_response(),
             Err(err) => {
-                // Log internally but never expose raw error details to clients
                 eprintln!("[s_web] handler error: {:?}", err);
                 ResponseBuilder::internal_error()
             }
@@ -258,14 +270,5 @@ where
 impl IntoResponse for Response {
     fn into_response(self) -> Response {
         self
-    }
-}
-
-impl<const N: usize> IntoResponse for [u8; N] {
-    fn into_response(self) -> Response {
-        ResponseBuilder::new()
-            .status(hyper::StatusCode::OK)
-            .content_type("application/octet-stream")
-            .body(self.to_vec())
     }
 }

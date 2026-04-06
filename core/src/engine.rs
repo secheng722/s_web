@@ -15,6 +15,16 @@ use crate::{
 /// Type alias for lifecycle hooks
 type LifecycleHook = Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
+/// Pre-processed server data ready for the accept loop
+type PreprocessedGroup = (String, Arc<RouterGroup>, Arc<Vec<Middleware>>);
+
+struct ServerContext {
+    router: Arc<Router>,
+    groups: Arc<Vec<PreprocessedGroup>>,
+    global_middlewares: Arc<Vec<Middleware>>,
+    has_global_middleware: bool,
+}
+
 /// A group of routes with shared prefix and middleware
 pub struct RouterGroup {
     prefix: String,
@@ -231,15 +241,10 @@ impl Engine {
         self
     }
 
-    /// Automatically add swagger endpoints based on registered routes
     fn add_swagger_endpoints(&mut self) {
-        // Collect all routes from main router and groups
         let mut all_routes = Vec::new();
-
-        // Add routes from main router
         all_routes.extend(self.router.get_all_routes());
 
-        // Add routes from all groups
         for group in self.groups.values() {
             all_routes.extend(group.router.get_all_routes());
         }
@@ -250,11 +255,8 @@ impl Engine {
 
         let json_path = "/docs/swagger.json";
         let ui_path = "/docs/";
-
-        // Clone swagger_info for use in closure
         let swagger_info = self.swagger_info.clone();
 
-        // Add swagger.json endpoint
         self.get(json_path, move |_ctx: RequestCtx| {
             let routes = all_routes.clone();
             let swagger_info = swagger_info.clone();
@@ -270,7 +272,6 @@ impl Engine {
             }
         });
 
-        // Add swagger UI endpoint
         self.get(ui_path, |_ctx: RequestCtx| async {
             use crate::response::ResponseBuilder;
             use crate::swagger::generate_swagger_ui;
@@ -285,7 +286,6 @@ impl Engine {
 
     /// Start the HTTP server
     pub async fn run(mut self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // Execute startup hooks
         for hook in &self.startup_hooks {
             hook().await;
         }
@@ -294,122 +294,21 @@ impl Engine {
         println!("🚀 Server running on http://{addr}");
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
-        // Add swagger endpoints only when explicitly enabled
         if self.swagger_enabled {
             self.add_swagger_endpoints();
             println!("📖 Swagger UI available at http://{addr}/docs/");
         }
 
-        let global_middlewares = Arc::new(self.middlewares);
-        
-        // Pre-process groups for optimal matching and pre-combine middlewares
-        let mut group_data: Vec<(String, Arc<RouterGroup>, Arc<Vec<Middleware>>)> = self
-            .groups
-            .into_iter()
-            .map(|(prefix, group)| {
-                let mut combined = Vec::with_capacity(global_middlewares.len() + group.middlewares.len());
-                combined.extend(global_middlewares.iter().cloned());
-                combined.extend(group.middlewares.iter().cloned());
-                (prefix, Arc::new(group), Arc::new(combined))
-            })
-            .collect();
-
-        // Sort by prefix length (longest first) for better matching
-        group_data.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
-
-        let router = Arc::new(self.router);
-        let groups = Arc::new(group_data);
-
-        // Pre-calculate if we have any middleware for optimization
-        let has_global_middleware = !global_middlewares.is_empty();
-        // hyper graceful shutdown
+        let shutdown_hooks = std::mem::take(&mut self.shutdown_hooks);
+        let server_ctx = self.build_server_context();
         let graceful = GracefulShutdown::new();
 
-        loop {
-            tokio::select! {
-                Ok((stream, remote_addr)) = listener.accept() => {
-                    let io = TokioIo::new(stream);
-                    let router = router.clone();
-                    let global_middlewares = global_middlewares.clone();
-                    let groups = groups.clone();
-                    
-                    let conn = http1::Builder::new()
-                        .serve_connection(io, service_fn(move |req| {
-                            let router = router.clone();
-                            let global_middlewares = global_middlewares.clone();
-                            let groups = groups.clone();
+        accept_loop(listener, server_ctx, &graceful).await;
 
-                            async move {
-                                let path = req.uri().path().to_owned();
-
-                                // Prefix matching with boundary check:
-                                // "/user" must not match "/users" — verify next char is '/' or end.
-                                let matched_group = groups
-                                    .iter()
-                                    .find(|(prefix, _, _)| {
-                                        path.starts_with(prefix.as_str())
-                                            && (path.len() == prefix.len()
-                                                || path.as_bytes().get(prefix.len()) == Some(&b'/'))
-                                    })
-                                    .map(|(_, group, middlewares)| (group.clone(), middlewares.clone()));
-
-                                let ctx = RequestCtx::new(req).with_remote_addr(remote_addr);
-
-                                let response = if let Some((group, combined_middlewares)) = matched_group {
-                                    // Group request handling
-                                    if combined_middlewares.is_empty() {
-                                        // Fast path: no middleware at all
-                                        group.handle_request(ctx).await
-                                    } else {
-                                        // Middleware path
-                                        let endpoint = (move |ctx| {
-                                            let group = group.clone();
-                                            async move { group.handle_request(ctx).await }
-                                        }).into_next();
-
-                                        execute_chain(combined_middlewares, endpoint, ctx).await
-                                    }
-                                } else {
-                                    // Main router handling
-                                    if !has_global_middleware {
-                                        // Fast path: no middleware
-                                        router.handle_request(ctx).await
-                                    } else {
-                                        // Middleware path
-                                        let endpoint = (move |ctx| {
-                                            let router = router.clone();
-                                            async move { router.handle_request(ctx).await }
-                                        }).into_next();
-
-                                        execute_chain(global_middlewares, endpoint, ctx).await
-                                    }
-                                };
-
-                                Ok::<_, Infallible>(response)
-                            }
-                        }));
-
-                    let fut = graceful.watch(conn);
-                    tokio::spawn(async move {
-                        if let Err(err) = fut.await {
-                            eprintln!("Connection error {remote_addr}: {err:?}");
-                        }
-                    });
-                }
-
-                _ = tokio::signal::ctrl_c() => {
-                    drop(listener);
-                    eprintln!("\n🛑 Graceful shutdown signal received");
-                    
-                    // Execute shutdown hooks
-                    for hook in &self.shutdown_hooks {
-                        hook().await;
-                    }
-                    
-                    break;
-                }
-            }
+        for hook in &shutdown_hooks {
+            hook().await;
         }
+
         tokio::select! {
             _ = graceful.shutdown() => {
                 eprintln!("✅ All connections gracefully closed");
@@ -420,5 +319,110 @@ impl Engine {
         }
 
         Ok(())
+    }
+
+    /// Pre-process groups and middleware for the request handling path
+    fn build_server_context(self) -> ServerContext {
+        let global_middlewares = Arc::new(self.middlewares);
+
+        let mut group_data: Vec<(String, Arc<RouterGroup>, Arc<Vec<Middleware>>)> = self
+            .groups
+            .into_iter()
+            .map(|(prefix, group)| {
+                let mut combined =
+                    Vec::with_capacity(global_middlewares.len() + group.middlewares.len());
+                combined.extend(global_middlewares.iter().cloned());
+                combined.extend(group.middlewares.iter().cloned());
+                (prefix, Arc::new(group), Arc::new(combined))
+            })
+            .collect();
+
+        group_data.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
+        let has_global_middleware = !global_middlewares.is_empty();
+
+        ServerContext {
+            router: Arc::new(self.router),
+            groups: Arc::new(group_data),
+            global_middlewares,
+            has_global_middleware,
+        }
+    }
+}
+
+/// Accept and handle incoming connections
+async fn accept_loop(
+    listener: tokio::net::TcpListener,
+    ctx: ServerContext,
+    graceful: &GracefulShutdown,
+) {
+    loop {
+        tokio::select! {
+            Ok((stream, remote_addr)) = listener.accept() => {
+                let io = TokioIo::new(stream);
+                let router = ctx.router.clone();
+                let groups = ctx.groups.clone();
+                let global_middlewares = ctx.global_middlewares.clone();
+                let has_global_middleware = ctx.has_global_middleware;
+
+                let conn = http1::Builder::new()
+                    .serve_connection(io, service_fn(move |req| {
+                        let router = router.clone();
+                        let groups = groups.clone();
+                        let global_middlewares = global_middlewares.clone();
+
+                        async move {
+                            let path = req.uri().path().to_owned();
+
+                            let matched_group = groups
+                                .iter()
+                                .find(|(prefix, _, _)| {
+                                    path.starts_with(prefix.as_str())
+                                        && (path.len() == prefix.len()
+                                            || path.as_bytes().get(prefix.len()) == Some(&b'/'))
+                                })
+                                .map(|(_, group, middlewares)| (group.clone(), middlewares.clone()));
+
+                            let ctx = RequestCtx::new(req).with_remote_addr(remote_addr);
+
+                            let response = if let Some((group, combined_middlewares)) = matched_group {
+                                if combined_middlewares.is_empty() {
+                                    group.handle_request(ctx).await
+                                } else {
+                                    let endpoint = (move |ctx| {
+                                        let group = group.clone();
+                                        async move { group.handle_request(ctx).await }
+                                    })
+                                    .into_next();
+                                    execute_chain(combined_middlewares, endpoint, ctx).await
+                                }
+                            } else if !has_global_middleware {
+                                router.handle_request(ctx).await
+                            } else {
+                                let endpoint = (move |ctx| {
+                                    let router = router.clone();
+                                    async move { router.handle_request(ctx).await }
+                                })
+                                .into_next();
+                                execute_chain(global_middlewares, endpoint, ctx).await
+                            };
+
+                            Ok::<_, Infallible>(response)
+                        }
+                    }));
+
+                let fut = graceful.watch(conn);
+                tokio::spawn(async move {
+                    if let Err(err) = fut.await {
+                        eprintln!("Connection error {remote_addr}: {err:?}");
+                    }
+                });
+            }
+            _ = tokio::signal::ctrl_c() => {
+                drop(listener);
+                eprintln!("\n🛑 Graceful shutdown signal received");
+                return;
+            }
+        }
     }
 }

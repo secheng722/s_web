@@ -66,6 +66,12 @@ impl RouterGroup {
         self
     }
 
+    /// Add a PATCH route to this group.
+    pub fn patch(&mut self, path: &str, handler: impl Handler) -> &mut Self {
+        self.add_route("PATCH", path, handler);
+        self
+    }
+
     /// Add a DELETE route to this group
     pub fn delete(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("DELETE", path, handler);
@@ -211,6 +217,12 @@ impl Engine {
     /// Add a PUT route
     pub fn put(&mut self, path: &str, handler: impl Handler) -> &mut Self {
         self.add_route("PUT", path, handler);
+        self
+    }
+
+    /// Add a PATCH route.
+    pub fn patch(&mut self, path: &str, handler: impl Handler) -> &mut Self {
+        self.add_route("PATCH", path, handler);
         self
     }
 

@@ -185,7 +185,7 @@ ResponseBuilder::new()
 
 ## 示例
 
-七个可运行项目，每个都是独立的 Cargo 包——可以单独复制出去使用。
+八个可运行项目，每个都是独立的 Cargo 包——可以单独复制出去使用。
 
 | # | 目录 | 主题 | 运行方式 |
 |---|------|------|---------|
@@ -196,6 +196,7 @@ ResponseBuilder::new()
 | 5 | [05_swagger](examples/05_swagger) | Swagger UI、Bearer Auth 文档 | `cargo run -p example_swagger` |
 | 6 | [06_sqlx_sqlite_crud](examples/06_sqlx_sqlite_crud) | sqlx + SQLite，连接池 | `cargo run -p example_sqlx_sqlite_crud` |
 | 7 | [07_seaorm_sqlite_crud](examples/07_seaorm_sqlite_crud) | SeaORM Entity，自动建表 | `cargo run -p example_seaorm_sqlite_crud` |
+| 8 | [08_mini_blog](examples/08_mini_blog) | 多文件 mini blog、分层结构、sqlx + SQLite | `cargo run -p mini_blog` |
 
 ---
 

@@ -1,0 +1,11 @@
+[package]
+name = "mini_blog"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+s_web = { path = "../../core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros"] }

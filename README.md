@@ -185,7 +185,7 @@ ResponseBuilder::new()
 
 ## Examples
 
-Seven runnable projects, each a self-contained Cargo package — copy any one out and use it standalone.
+Eight runnable projects, each a self-contained Cargo package — copy any one out and use it standalone.
 
 | # | Directory | Topics | Run |
 |---|-----------|--------|-----|
@@ -196,6 +196,7 @@ Seven runnable projects, each a self-contained Cargo package — copy any one ou
 | 5 | [05_swagger](examples/05_swagger) | Swagger UI, bearer auth docs | `cargo run -p example_swagger` |
 | 6 | [06_sqlx_sqlite_crud](examples/06_sqlx_sqlite_crud) | sqlx + SQLite, connection pool | `cargo run -p example_sqlx_sqlite_crud` |
 | 7 | [07_seaorm_sqlite_crud](examples/07_seaorm_sqlite_crud) | SeaORM entity, auto migration | `cargo run -p example_seaorm_sqlite_crud` |
+| 8 | [08_mini_blog](examples/08_mini_blog) | Multi-file mini blog, layered architecture, sqlx + SQLite | `cargo run -p mini_blog` |
 
 ---
 
